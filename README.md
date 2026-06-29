@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/suchitchopade3110-arch/NotAFlop/main/NOTAFLOP.png" width="340" alt="NotAFlop Logo" />
+<img src="https://raw.githubusercontent.com/suchitchopade3110-arch/NotAFlop/main/NOTAFLOP.png" />
 <br/>
 <!-- Animated tagline banner -->
 <img src="https://readme-typing-svg.demolab.com?font=Sora&weight=700&size=28&duration=3000&pause=1000&color=C9A84C&center=true&vCenter=true&width=600&lines=Validate+before+you+build.;11+AI+agents.+30+seconds.+Free.;Know+the+truth+about+your+idea." alt="Typing SVG" />
