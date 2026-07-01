@@ -15,20 +15,7 @@ except ModuleNotFoundError:
 
 from agents.specialist_agents import ALL_AGENTS
 from orchestrator.state import AgentOutput, GraphState
-
-WEIGHTS: dict[str, float] = {
-    "problem": 1.20,
-    "solution": 1.10,
-    "tam": 1.00,
-    "team": 0.90,
-    "moat": 0.90,
-    "unit_economics": 0.85,
-    "gtm": 0.85,
-    "risk": 0.95,
-    "timing": 0.95,
-    "ask": 0.80,
-    "yc_signal": 1.00,
-}
+from services.gate import aggregate_results
 
 
 async def run_agents_node(state: GraphState) -> GraphState:
@@ -59,28 +46,6 @@ async def aggregate_node(state: GraphState) -> GraphState:
     """Compute VC-weighted score and emit verdict."""
     score, verdict = aggregate_results(state.get("results", {}))
     return {**state, "aggregated_score": score, "verdict": verdict}
-
-
-def aggregate_results(results: dict[str, AgentOutput]) -> tuple[int, str]:
-    weighted_sum = 0.0
-    weight_total = 0.0
-
-    for name, weight in WEIGHTS.items():
-        if name in results:
-            weighted_sum += results[name]["score"] * weight
-            weight_total += weight
-
-    raw_score = (weighted_sum / weight_total) * 10 if weight_total > 0 else 0
-    final_score = round(min(100, max(0, raw_score)))
-
-    if final_score >= 70:
-        verdict = "go"
-    elif final_score >= 50:
-        verdict = "pivot"
-    else:
-        verdict = "no-go"
-
-    return final_score, verdict
 
 
 def build_graph():
