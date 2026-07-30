@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from repositories import report_repository, session_repository
 from routers import phase1, phase2, phase3, phase4
 from services import mongo
 
@@ -10,6 +11,8 @@ from services import mongo
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await mongo.connect()
+    await report_repository.ensure_indexes()
+    await session_repository.ensure_indexes()
     yield
     await mongo.disconnect()
 
