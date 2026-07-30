@@ -2,9 +2,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import agents.verifier as verifier_module
 from agents.specialist_agents import ALL_AGENTS
 from core.config import RATE_LIMIT_SESSION_MAX
 from core.session import SESSION_HEADER
+from models.documents import VerifierOutput
 from orchestrator.state import AgentOutput
 from routers import phase3
 from services import rate_limiter
@@ -20,6 +22,15 @@ def _patch_agents(monkeypatch):
         async def _run(state, _name=agent.name):
             return AgentOutput(agent=_name, passed=True, score=8, evidence="e", feedback="f")
         monkeypatch.setattr(agent, "run", _run)
+
+
+@pytest.fixture(autouse=True)
+def _patch_verifier(monkeypatch):
+    """Shadow mode fires the Verifier after every successful generation —
+    fake it out so these rate-limit-focused tests never hit Groq."""
+    async def _fake_run(results):
+        return VerifierOutput(confidence_score=9, passed=True, evidence="e", feedback="f", model="m")
+    monkeypatch.setattr(verifier_module, "run", _fake_run)
 
 
 @pytest.fixture(autouse=True)

@@ -13,6 +13,7 @@ scores computed under different WEIGHTS_VERSIONs aren't directly
 comparable. Reports persist each agent's raw score specifically so they
 can be re-aggregated under a different WEIGHTS_VERSION retroactively.
 """
+from models.documents import VerifierOutput
 from orchestrator.state import AgentOutput
 
 WEIGHTS: dict[str, float] = {
@@ -57,6 +58,29 @@ def _verdict_for(score: int) -> str:
     elif score >= PIVOT_THRESHOLD:
         return "pivot"
     return "no-go"
+
+
+def apply_verifier_penalty(raw_score: int, verifier: VerifierOutput) -> tuple[int, str, bool]:
+    """
+    Confidence multiplier, not another additive weight: the Verifier
+    doesn't score a pitch dimension, it audits the other 12 agents, so a
+    bad confidence_score should drag the WHOLE gate down rather than just
+    losing its own slice of a weighted average.
+
+    confidence_score=10 -> multiplier 1.0 (no change).
+    confidence_score=0  -> multiplier 0.7 (heaviest penalty, 30% off).
+
+    Returns (adjusted_score, adjusted_verdict, verdict_would_flip) — the
+    last compares the verdict under raw_score against the verdict under
+    adjusted_score. Shadow mode (VERIFIER_PENALTY_ENABLED=false) gates on
+    raw_score regardless of this result; it's persisted/logged for
+    calibration.
+    """
+    multiplier = 0.7 + 0.03 * verifier.confidence_score
+    adjusted_score = round(min(100, max(0, raw_score * multiplier)))
+    adjusted_verdict = _verdict_for(adjusted_score)
+    verdict_would_flip = adjusted_verdict != _verdict_for(raw_score)
+    return adjusted_score, adjusted_verdict, verdict_would_flip
 
 
 def top_risks(results: dict[str, AgentOutput], n: int = 3) -> list[dict]:

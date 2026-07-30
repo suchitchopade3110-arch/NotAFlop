@@ -1,6 +1,10 @@
 import asyncio
 
+import pytest
+
+import agents.verifier as verifier_module
 from agents.specialist_agents import ALL_AGENTS
+from models.documents import VerifierOutput
 from orchestrator import graph
 from orchestrator.state import AgentOutput
 from repositories import report_repository
@@ -13,6 +17,24 @@ def _patch_agents(monkeypatch, score=8):
         async def _run(state, _name=agent.name, _score=score):
             return AgentOutput(agent=_name, passed=_score >= 6, score=_score, evidence="e", feedback="f")
         monkeypatch.setattr(agent, "run", _run)
+
+
+@pytest.fixture(autouse=True)
+def _patch_verifier(monkeypatch):
+    """Shadow mode spawns the Verifier after every persisted report — these
+    tests are about the persistence guarantee, not the Verifier itself, so
+    fake it out to avoid a real Groq call."""
+    async def _fake_run(results):
+        return VerifierOutput(confidence_score=9, passed=True, evidence="e", feedback="f", model="m")
+    monkeypatch.setattr(verifier_module, "run", _fake_run)
+
+
+async def _drain_background_tasks() -> None:
+    """Waits out any fire-and-forget tasks (e.g. the shadow Verifier) so a
+    test doesn't leave orphaned tasks behind for the next one."""
+    pending = list(graph._background_tasks)
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def _drain(queue: asyncio.Queue) -> list:
@@ -36,6 +58,7 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
 
     items = await _drain(queue)
     await task  # pipeline (incl. persistence) is fully finished by now
+    await _drain_background_tasks()  # let the shadow Verifier finish too
 
     final_events = [i for i in items if i["type"] == "final"]
     assert len(final_events) == 1
@@ -60,6 +83,7 @@ async def test_no_persist_without_session_id(mongo_db, monkeypatch):
     task = graph.spawn_pipeline(queue, "x", "y", {}, session_id=None, ip=None)
     await _drain(queue)
     await task
+    await _drain_background_tasks()
 
     coll = mongo_db["reports"]
     assert await coll.count_documents({}) == 0
@@ -79,11 +103,11 @@ async def test_persists_even_if_sse_consumer_disconnects_early(mongo_db, monkeyp
 
     await gen.aclose()  # simulates the client disconnecting mid-stream
 
-    # Whatever's still pending must be allowed to finish — this is what a
-    # real ASGI server does implicitly by not killing the process.
-    pending = [t for t in graph._background_tasks]
-    if pending:
-        await asyncio.gather(*pending, return_exceptions=True)
+    # Whatever's still pending (the pipeline, then the shadow Verifier it
+    # spawns) must be allowed to finish — this is what a real ASGI server
+    # does implicitly by not killing the process.
+    await _drain_background_tasks()
+    await _drain_background_tasks()  # the pipeline's own finally spawns the shadow task after the first drain
 
     docs = await report_repository.list_by_session("sess-disconnect")
     assert len(docs) == 1
