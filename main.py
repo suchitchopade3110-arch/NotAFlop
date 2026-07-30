@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from repositories import report_repository, session_repository
-from routers import phase1, phase2, phase3, phase4
+from routers import phase1, phase2, phase3, phase4, reports
 from services import mongo
 
 
@@ -30,6 +30,7 @@ app.include_router(phase1.router, prefix="/api/phase1", tags=["Phase 1 - Filter"
 app.include_router(phase2.router, prefix="/api/phase2", tags=["Phase 2 - Validate"])
 app.include_router(phase3.router, prefix="/api/phase3", tags=["Phase 3 - Analyze"])
 app.include_router(phase4.router, prefix="/api/phase4", tags=["Phase 4 - Gate"])
+app.include_router(reports.router, prefix="/api", tags=["Reports"])
 
 
 @app.get("/health")
