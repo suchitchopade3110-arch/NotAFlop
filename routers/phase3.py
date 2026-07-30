@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from core.session import SessionContext, get_session_context
+from core.dependencies import enforce_rate_limit
+from core.session import SESSION_HEADER, SessionContext
 from orchestrator.graph import stream_analysis
 
 router = APIRouter()
@@ -16,7 +17,7 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/analyze")
-async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(get_session_context)):
+async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforce_rate_limit)):
     """
     Stream Phase 3 agent results via SSE.
     Each agent emits a JSON event as it completes.
@@ -27,12 +28,20 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(get_se
       { type: "agent_error", payload: { agent, error } }
       { type: "final",       payload: { score, verdict, errors } }
       [DONE]
+
+    Rate limited: 3/day per session (primary), 15/day per ip (cost
+    backstop). Exceeding either returns 429 with a structured body
+    (limit, remaining, reset_at, scope) — see models.schemas.RateLimitError.
     """
     if not body.transcript.strip():
         raise HTTPException(status_code=400, detail="Transcript is empty.")
     if not body.keyword.strip():
         raise HTTPException(status_code=400, detail="Keyword is empty.")
 
+    # The endpoint returns its own StreamingResponse, so headers set on the
+    # dependency-injected Response (inside get_session_context) never make
+    # it to the client — FastAPI only merges those for responses it builds
+    # itself. Set X-Session-Id again here, on the response actually sent.
     return StreamingResponse(
         stream_analysis(
             body.transcript,
@@ -46,5 +55,6 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(get_se
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",      # disable nginx buffering
+            SESSION_HEADER: session.session_id,
         },
     )
