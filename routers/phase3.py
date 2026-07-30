@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from core.session import SessionContext, get_session_context
 from orchestrator.graph import stream_analysis
 
 router = APIRouter()
@@ -9,11 +11,12 @@ router = APIRouter()
 class AnalyzeRequest(BaseModel):
     transcript: str
     keyword: str
-    signals: dict       # from Phase 2 smart data layer
+    signals: dict                      # from Phase 2 smart data layer
+    filter_result: dict | None = None  # Phase 1 result, persisted alongside the report if supplied
 
 
 @router.post("/analyze")
-async def analyze(body: AnalyzeRequest):
+async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(get_session_context)):
     """
     Stream Phase 3 agent results via SSE.
     Each agent emits a JSON event as it completes.
@@ -31,7 +34,14 @@ async def analyze(body: AnalyzeRequest):
         raise HTTPException(status_code=400, detail="Keyword is empty.")
 
     return StreamingResponse(
-        stream_analysis(body.transcript, body.keyword, body.signals),
+        stream_analysis(
+            body.transcript,
+            body.keyword,
+            body.signals,
+            session_id=session.session_id,
+            ip=session.ip,
+            filter_result=body.filter_result,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
