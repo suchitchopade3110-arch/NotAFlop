@@ -71,6 +71,9 @@ def test_blocks_with_429_after_session_quota_exceeded(mongo_db):
     assert body["limit"] == RATE_LIMIT_SESSION_MAX
     assert body["remaining"] == 0
     assert "reset_at" in body
+    # X-Session-Id must survive onto the 429 too — otherwise a session that
+    # trips the ip cap on its very first request never learns its own id.
+    assert res.headers[SESSION_HEADER] == "quota-session-2"
 
 
 def test_mints_session_id_when_absent(mongo_db):
