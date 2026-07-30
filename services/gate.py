@@ -13,8 +13,12 @@ scores computed under different WEIGHTS_VERSIONs aren't directly
 comparable. Reports persist each agent's raw score specifically so they
 can be re-aggregated under a different WEIGHTS_VERSION retroactively.
 """
+import logging
+
 from models.documents import VerifierOutput
 from orchestrator.state import AgentOutput
+
+logger = logging.getLogger("notaflop.gate")
 
 WEIGHTS: dict[str, float] = {
     "problem": 1.20,
@@ -79,7 +83,17 @@ def apply_verifier_penalty(raw_score: int, verifier: VerifierOutput) -> tuple[in
     multiplier = 0.7 + 0.03 * verifier.confidence_score
     adjusted_score = round(min(100, max(0, raw_score * multiplier)))
     adjusted_verdict = _verdict_for(adjusted_score)
-    verdict_would_flip = adjusted_verdict != _verdict_for(raw_score)
+    raw_verdict = _verdict_for(raw_score)
+    verdict_would_flip = adjusted_verdict != raw_verdict
+
+    if verdict_would_flip:
+        logger.warning(
+            "verifier_verdict_flip raw_score=%d raw_verdict=%s adjusted_score=%d "
+            "adjusted_verdict=%s confidence_score=%d conflicts=%d",
+            raw_score, raw_verdict, adjusted_score, adjusted_verdict,
+            verifier.confidence_score, len(verifier.conflicts),
+        )
+
     return adjusted_score, adjusted_verdict, verdict_would_flip
 
 
