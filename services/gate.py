@@ -3,6 +3,15 @@ Phase 4 - Gate.
 Single source of truth for VC-weighted scoring, verdict, and gate reasoning.
 Consumed by Phase 3's orchestrator (for the inline SSE 'final' event) and by
 the standalone Phase 4 /gate endpoint (for a clean, re-computable verdict).
+
+WEIGHTS is versioned (core.config.WEIGHTS_VERSION) — bump the version
+any time a weight changes or an agent is added/removed. aggregate_results
+divides by the dynamically-summed weight of whatever agents are present,
+so adding a new weighted agent measurably dilutes every existing agent's
+share of the final score; that's expected, not a bug, but it does mean
+scores computed under different WEIGHTS_VERSIONs aren't directly
+comparable. Reports persist each agent's raw score specifically so they
+can be re-aggregated under a different WEIGHTS_VERSION retroactively.
 """
 from orchestrator.state import AgentOutput
 
@@ -18,6 +27,7 @@ WEIGHTS: dict[str, float] = {
     "timing": 0.95,
     "ask": 0.80,
     "yc_signal": 1.00,
+    "lovers_test": 0.85,  # added in WEIGHTS_VERSION 2 — additive, not renormalized (see core.config)
 }
 
 GO_THRESHOLD = 70

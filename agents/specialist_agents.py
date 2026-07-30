@@ -1,23 +1,6 @@
-from agents.base_agent import AGENT_SYSTEM_SUFFIX, BaseAgent
-from core.config import ANALYSIS_MODEL, REASONING_MODEL
-
-
-class SpecialistAgent(BaseAgent):
-    def __init__(self, name: str, focus: str, rubric: str, model: str = ANALYSIS_MODEL):
-        self.name = name
-        self.focus = focus
-        self.rubric = rubric
-        self.model = model
-
-    @property
-    def system_prompt(self) -> str:
-        return (
-            f"You are NotAFlop's {self.focus} specialist. "
-            "Score this startup idea like a strict but useful VC analyst.\n\n"
-            f"Rubric:\n{self.rubric}\n"
-            f"{AGENT_SYSTEM_SUFFIX}"
-        )
-
+from agents.base_agent import SpecialistAgent
+from agents.lovers_test import lovers_test_agent
+from core.config import REASONING_MODEL
 
 ALL_AGENTS = [
     SpecialistAgent(
@@ -79,4 +62,5 @@ ALL_AGENTS = [
         "Reward ideas with YC-style traits: acute pain, fast iteration, simple wedge, and strong founder learning loops.",
         REASONING_MODEL,
     ),
+    lovers_test_agent,
 ]
