@@ -174,15 +174,29 @@ API docs: `http://127.0.0.1:8000/docs`
 ```env
 GROQ_API_KEY=your_key_here
  
-# Optional — data sources (stubs work without these)
-APIFY_TOKEN=
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-PRODUCT_HUNT_TOKEN=
+# MongoDB Atlas (or local mongod). App degrades gracefully if unreachable.
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB=notaflop
  
 # Optional — Redis (falls back to in-memory)
 REDIS_URL=redis://localhost:6379
+ 
+# Optional — data sources (stubs work without these)
+APIFY_API_KEY=
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+PRODUCT_HUNT_API_KEY=
+ 
+# Optional — rate limiting (defaults shown)
+RATE_LIMIT_SESSION_MAX=3
+RATE_LIMIT_IP_MAX=15
+RATE_LIMIT_WINDOW_SECONDS=86400
+ 
+# Optional — Verifier shadow mode (default false; raw_score gates until flipped)
+VERIFIER_PENALTY_ENABLED=false
 ```
+
+> See `.env.example` for the full, always-current list.
  
 ---
  
