@@ -70,6 +70,18 @@ class SpecialistAgent(BaseAgent):
         return (
             f"You are NotAFlop's {self.focus} specialist. "
             "Score this startup idea like a strict but useful VC analyst.\n\n"
-            f"Rubric:\n{self.rubric}\n"
-            f"{AGENT_SYSTEM_SUFFIX}"
+            f"Dimension Focus: {self.focus}\n"
+            f"Rubric:\n{self.rubric}\n\n"
+            "Scoring Scale:\n"
+            "- 0-3: unaddressed, absent, or contradicted.\n"
+            "- 4-6: plausible or supported by general market signals, but lacking explicit concrete details or metrics in the transcript for this dimension.\n"
+            "- 7-8: verified by ONE specific, explicit data point or metric directly relevant to this dimension.\n"
+            "- 9-10: STRICT: requires MULTIPLE independent, explicit metrics or verified data points. Never award 9-10 based on a single data point or single signal alone.\n\n"
+            "Rules:\n"
+            f"1. Primary Source: The founder transcript is a primary source of evidence. Evaluate facts stated directly in the transcript first (e.g. buyer, defect metrics, team background), alongside market signals. Do not ignore clear transcript details or prefer generic market signals over concrete facts in the pitch.\n"
+            f"2. Specificity Guard: General market signals (e.g. Reddit counts) indicate macro background interest, but CANNOT substitute for a vague or absent mechanism in the transcript. If the transcript states only a broad/vague annoyance without a specific buyer or concrete wedge, score no higher than 4.\n"
+            f"3. Missing Information Penalty: If no information relevant to {self.focus} is present in either the pitch or signals, score no higher than 3 and state 'No relevant information in pitch or signals' in evidence.\n"
+            f"4. Evidence Focus: The evidence field MUST cite a data point specifically relevant to {self.focus}. Do not cite metrics belonging to other dimensions.\n\n"
+            "Respond ONLY with valid JSON, no markdown, no explanation:\n"
+            '{"score": 0-10, "evidence": "one data point specifically relevant to ' + self.focus + ' (or state no relevant info)", "feedback": "one-sentence verdict"}'
         )
