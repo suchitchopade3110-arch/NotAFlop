@@ -17,7 +17,7 @@ passed = true if score >= 6."""
 
 async def run(transcript: str) -> AgentResult:
     user_msg = f'Founder pitch:\n"""\n{transcript}\n"""'
-    raw = await chat(FILTER_MODEL, SYSTEM, user_msg, FILTER_MAX_TOKENS)
+    raw = await chat(FILTER_MODEL, SYSTEM, user_msg, FILTER_MAX_TOKENS, temperature=0)
 
     try:
         data = json.loads(raw)

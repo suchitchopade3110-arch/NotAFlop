@@ -19,20 +19,30 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "pitch.webm") -> 
         return res.json()["text"].strip()
 
 
-async def chat(model: str, system: str, user: str, max_tokens: int = 300) -> str:
-    """Single-turn chat completion via GROQ."""
+async def chat(model: str, system: str, user: str, max_tokens: int = 300, temperature: float | None = None) -> str:
+    """Single-turn chat completion via GROQ.
+
+    temperature is opt-in and omitted from the request by default, leaving
+    Groq's own default in effect for callers that don't pass it — only
+    callers that need deterministic output (e.g. Phase 1's pass/fail
+    filter) should set it explicitly.
+    """
+    payload = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
+    if temperature is not None:
+        payload["temperature"] = temperature
+
     async with httpx.AsyncClient(timeout=20) as client:
         res = await client.post(
             f"{GROQ_BASE}/chat/completions",
             headers={**_headers, "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "max_tokens": max_tokens,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-            },
+            json=payload,
         )
         if res.status_code >= 400:
             print(f"Groq error body: {res.text}")
