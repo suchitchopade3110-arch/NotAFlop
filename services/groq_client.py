@@ -34,5 +34,7 @@ async def chat(model: str, system: str, user: str, max_tokens: int = 300) -> str
                 ],
             },
         )
+        if res.status_code >= 400:
+            print(f"Groq error body: {res.text}")
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"].strip()

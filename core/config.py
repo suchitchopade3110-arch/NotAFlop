@@ -14,7 +14,7 @@ MONGODB_DB: str = os.getenv("MONGODB_DB", "notaflop")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "whisper-large-v3")
 FILTER_MODEL = os.getenv("FILTER_MODEL", "llama-3.1-8b-instant")
 ANALYSIS_MODEL = os.getenv("ANALYSIS_MODEL", "llama-3.3-70b-versatile")
-REASONING_MODEL = os.getenv("REASONING_MODEL", "deepseek-r1-distill-llama-70b")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "llama-3.3-70b-versatile")
 
 # Limits
 FILTER_MAX_TOKENS = 300
