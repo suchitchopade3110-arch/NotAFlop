@@ -111,6 +111,7 @@ async def _persist_report(
     ip: str | None,
     filter_result: dict | None,
     *,
+    public_id: str | None = None,
     verifier: VerifierOutput | None = None,
     adjusted_score: int | None = None,
     gating_score: Literal["raw", "adjusted"] = "raw",
@@ -134,7 +135,8 @@ async def _persist_report(
         for name, out in results.items()
     }
 
-    public_id = generate_public_id()
+    if not public_id:
+        public_id = generate_public_id()
     doc = ReportDocument(
         public_id=public_id,
         session_id=session_id,
@@ -259,22 +261,32 @@ async def _run_pipeline(
                 errors.append("verifier: blocking call failed — gated on raw_score instead.")
                 logger.error("Blocking Verifier call failed — falling back to raw_score.", exc_info=True)
 
+        public_id = generate_public_id() if session_id else None
         await queue.put(
-            {"type": "final", "payload": {"score": gated_score, "verdict": gated_verdict, "errors": errors}}
+            {
+                "type": "final",
+                "payload": {
+                    "public_id": public_id,
+                    "score": gated_score,
+                    "verdict": gated_verdict,
+                    "errors": errors,
+                },
+            }
         )
     finally:
         await queue.put(None)  # unblocks the SSE generator if it's still listening
-        public_id = await _persist_report(
+        saved_public_id = await _persist_report(
             transcript, keyword, signals, results, raw_score, gated_verdict,
             session_id, ip, filter_result,
+            public_id=public_id,
             verifier=verifier_output, adjusted_score=adjusted_score,
             gating_score=gating_score, verdict_would_flip=verdict_would_flip,
         )
-        if public_id and not VERIFIER_PENALTY_ENABLED:
+        if saved_public_id and not VERIFIER_PENALTY_ENABLED:
             # Shadow mode: Verifier hasn't run yet — kick it off now,
             # independent of this task's own completion, and patch the
             # doc when it lands. Never blocks the SSE stream.
-            _spawn_verifier_shadow(public_id, raw_score, results)
+            _spawn_verifier_shadow(saved_public_id, raw_score, results)
 
 
 def spawn_pipeline(

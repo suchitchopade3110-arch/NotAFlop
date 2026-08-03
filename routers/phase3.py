@@ -28,7 +28,7 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforc
     SSE event types:
       { type: "agent",       payload: AgentOutput }
       { type: "agent_error", payload: { agent, error } }
-      { type: "final",       payload: { score, verdict, errors } }
+      { type: "final",       payload: { public_id, score, verdict, errors } }
       [DONE]
 
     Rate limited: 3/day per session (primary), 15/day per ip (cost

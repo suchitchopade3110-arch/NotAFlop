@@ -68,6 +68,7 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
     docs = await report_repository.list_by_session("sess-1")
     assert len(docs) == 1
     doc = docs[0]
+    assert doc.public_id == final_events[0]["payload"]["public_id"]
     assert doc.raw_score == final_events[0]["payload"]["score"]
     assert doc.verdict == final_events[0]["payload"]["verdict"]
     assert doc.weights_version == graph.WEIGHTS_VERSION
