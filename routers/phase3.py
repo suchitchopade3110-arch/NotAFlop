@@ -6,12 +6,14 @@ from core.dependencies import enforce_rate_limit
 from core.session import SESSION_HEADER, SessionContext
 from orchestrator.graph import stream_analysis
 
+from services.keyword_extractor import extract_keyword, KeywordExtractionError
+
 router = APIRouter()
 
 
 class AnalyzeRequest(BaseModel):
     transcript: str
-    keyword: str
+    keyword: str | None = None
     signals: dict                      # from Phase 2 smart data layer
     filter_result: dict | None = None  # Phase 1 result, persisted alongside the report if supplied
 
@@ -35,8 +37,16 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforc
     """
     if not body.transcript.strip():
         raise HTTPException(status_code=400, detail="Transcript is empty.")
-    if not body.keyword.strip():
-        raise HTTPException(status_code=400, detail="Keyword is empty.")
+
+    keyword = (body.keyword or "").strip()
+    if not keyword:
+        try:
+            keyword = await extract_keyword(body.transcript)
+        except KeywordExtractionError:
+            raise HTTPException(
+                status_code=422,
+                detail="couldn't extract a clear topic from this pitch — try being more specific",
+            )
 
     # The endpoint returns its own StreamingResponse, so headers set on the
     # dependency-injected Response (inside get_session_context) never make
@@ -45,7 +55,7 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforc
     return StreamingResponse(
         stream_analysis(
             body.transcript,
-            body.keyword,
+            keyword,
             body.signals,
             session_id=session.session_id,
             ip=session.ip,
