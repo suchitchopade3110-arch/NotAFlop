@@ -30,7 +30,7 @@ app.include_router(phase1.router, prefix="/api/phase1", tags=["Phase 1 - Filter"
 app.include_router(phase2.router, prefix="/api/phase2", tags=["Phase 2 - Validate"])
 app.include_router(phase3.router, prefix="/api/phase3", tags=["Phase 3 - Analyze"])
 app.include_router(phase4.router, prefix="/api/phase4", tags=["Phase 4 - Gate"])
-app.include_router(phase5.router, prefix="/api/phase5", tags=["Phase 5 - Plan"])
+app.include_router(phase5.router, prefix="/api/phase5", tags=["Phase 5 - Plan & Build"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
 
 

@@ -1,7 +1,8 @@
 from datetime import datetime
+from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from models.documents import AgentResultRecord, VerifierOutput
 
@@ -95,10 +96,6 @@ class RateLimitError(BaseModel):
 
 
 # ── Plan & Build (Phase 5) ───────────────────────────────────
-from enum import Enum
-from pydantic import Field
-
-
 class RolePriority(str, Enum):
     CRITICAL = "critical"
     IMPORTANT = "important"
@@ -143,4 +140,3 @@ class PlanResponse(BaseModel):
     solo_founder_note: str | None = Field(
         None, description="Populated only when idea can realistically be solo-built past MVP"
     )
-

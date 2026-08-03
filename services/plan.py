@@ -50,75 +50,66 @@ VERTICAL_ROLE_RULES = {
     ),
 }
 
-# ---- Risk keyword -> roadmap task injected into the relevant block ----
-RISK_TASK_MAP = {
-    "market": "Run 15 more customer discovery calls targeting the specific segment flagged as unverified",
-    "moat": "Ship one feature competitors structurally cannot copy quickly (data, network, or workflow lock-in)",
-    "unit economics": "Build a live CAC/LTV tracker before spending on any paid acquisition",
-    "team": "Close the most critical role gap before Day 30 — do not build solo past MVP if flagged",
-    "timing": "Validate urgency with 5 prospects willing to pre-pay or sign LOI before Day 45",
-    "gtm": "Test the top 2 acquisition channels with a $500 spend cap each before committing budget",
-}
 
-
-def _match_vertical_role(request: PlanRequest, idea_summary: str) -> TeamRole | None:
-    text = f"{request.vertical or ''} {idea_summary}".lower()
-    for keyword, role in VERTICAL_ROLE_RULES.items():
-        if keyword.replace("_", " ") in text or keyword in text:
-            return role
+def _detect_vertical(request: PlanRequest, idea_summary: str) -> str | None:
+    if request.vertical:
+        return request.vertical.lower()
+    summary_lower = idea_summary.lower()
+    for key in VERTICAL_ROLE_RULES:
+        if key in summary_lower:
+            return key
     return None
 
 
-def _risk_tasks_for_block(top_risks: list[str]) -> list[str]:
-    tasks = []
-    for risk in top_risks:
-        risk_lower = risk.lower()
-        for keyword, task in RISK_TASK_MAP.items():
-            if keyword in risk_lower:
-                tasks.append(task)
-                break
-    return tasks
-
-
 def recommend_team(request: PlanRequest, idea_summary: str) -> list[TeamRole]:
-    team = list(BASE_ROLES)
-    vertical_role = _match_vertical_role(request, idea_summary)
-    if vertical_role:
-        team.append(vertical_role)
-    return team
+    roles = list(BASE_ROLES)
+    matched_vertical = _detect_vertical(request, idea_summary)
+    if matched_vertical and matched_vertical in VERTICAL_ROLE_RULES:
+        roles.append(VERTICAL_ROLE_RULES[matched_vertical])
+    return roles
 
 
 def generate_roadmap(request: PlanRequest, idea_summary: str, top_risks: list[str]) -> list[RoadmapMilestone]:
-    risk_tasks = _risk_tasks_for_block(top_risks)
+    matched_vertical = _detect_vertical(request, idea_summary)
 
-    mvp_tasks = [
-        "Scope MVP to the single narrowest workflow that proves the core problem-solution fit",
-        "Ship to 10 hand-picked users, not a public launch",
-    ] + risk_tasks[:2]
+    # Day 1-30: Foundation
+    foundation_tasks = [
+        "Conduct 10 problem-interview calls with target users.",
+        "Scope absolute minimum feature set — cut everything optional.",
+        "Build basic core flow end-to-end.",
+    ]
+    if matched_vertical == "fintech":
+        foundation_tasks.append("Confirm legal/compliance boundary for early pilot.")
+    elif matched_vertical == "marketplace":
+        foundation_tasks.append("Hand-onboard first 5 supply-side users manually.")
 
-    launch_tasks = [
-        "Public launch on the channel with highest signal from Phase 2 data (Reddit/HN/PH)",
-        "Instrument activation and Day-7 retention before spending on acquisition",
-    ] + risk_tasks[2:3]
+    # Day 31-60: Validation / Pilot
+    pilot_tasks = [
+        "Launch working MVP to initial cohort of 20-50 target users.",
+        "Track core activation metric (e.g. completed first value action).",
+        "Iterate on feedback weekly — fix high-friction drop-offs.",
+    ]
 
+    # Day 61-90: Growth
     growth_tasks = [
-        "Double down on the single channel with best CAC from the launch block",
-        "Formalize the revenue model that showed real willingness-to-pay",
+        "Establish one repeatable acquisition channel.",
+        "Test baseline pricing / revenue model with real users.",
+        "Formulate post-MVP hiring or fundraising plan if metrics hold.",
     ]
 
     return [
         RoadmapMilestone(
             day_range="Day 1-30",
-            block_title="MVP Build",
-            tasks=mvp_tasks,
-            deliverable="Working MVP validated by 10 real users, not friends/family",
+            block_title="Foundation",
+            tasks=foundation_tasks,
+            deliverable="Scope defined + core flow built + initial user feedback",
             risk_flags=top_risks[:2],
         ),
         RoadmapMilestone(
             day_range="Day 31-60",
-            block_title="Launch",
-            tasks=launch_tasks,
-            deliverable="Public launch executed, activation/retention metrics instrumented",
+            block_title="Validation / Pilot",
+            tasks=pilot_tasks,
+            deliverable="Working MVP live with active initial users",
             risk_flags=top_risks[2:3],
         ),
         RoadmapMilestone(
