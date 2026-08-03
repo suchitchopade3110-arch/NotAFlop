@@ -92,3 +92,55 @@ class RateLimitError(BaseModel):
     remaining: int
     reset_at: datetime
     scope: Literal["session", "ip"]
+
+
+# ── Plan & Build (Phase 5) ───────────────────────────────────
+from enum import Enum
+from pydantic import Field
+
+
+class RolePriority(str, Enum):
+    CRITICAL = "critical"
+    IMPORTANT = "important"
+    NICE_TO_HAVE = "nice_to_have"
+
+
+class RoadmapMilestone(BaseModel):
+    day_range: str = Field(..., description="e.g. 'Day 1-30'")
+    block_title: str = Field(..., description="e.g. 'MVP Build'")
+    tasks: list[str]
+    deliverable: str
+    risk_flags: list[str] = Field(
+        default_factory=list,
+        description="Top risks from Phase 4 that this block should actively address",
+    )
+
+
+class TeamRole(BaseModel):
+    role: str
+    priority: RolePriority
+    reason: str = Field(..., description="Why this role matters for THIS idea specifically")
+    skills: list[str]
+    where_to_find: list[str] = Field(
+        default_factory=lambda: ["YC Co-founder Match", "AngelList", "Wellfound", "LinkedIn"]
+    )
+
+
+class PlanRequest(BaseModel):
+    report_id: str = Field(..., description="Public ID of the persisted report (e.g. 'rep_...')")
+    idea_summary: str | None = Field(
+        None, description="Optional override for idea summary. Defaults to report transcript."
+    )
+    vertical: str | None = Field(
+        None, description="Optional vertical tag: 'marketplace', 'fintech', 'devtool', 'consumer_social'"
+    )
+
+
+class PlanResponse(BaseModel):
+    roadmap: list[RoadmapMilestone]
+    team: list[TeamRole]
+    revenue_model_options: list[str]
+    solo_founder_note: str | None = Field(
+        None, description="Populated only when idea can realistically be solo-built past MVP"
+    )
+
