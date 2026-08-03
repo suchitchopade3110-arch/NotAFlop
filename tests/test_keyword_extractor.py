@@ -12,6 +12,19 @@ from orchestrator.state import AgentOutput
 from repositories import report_repository
 from services.keyword_extractor import extract_keyword, KeywordExtractionError
 from core.config import FILTER_MODEL
+from core.dependencies import enforce_rate_limit
+from core.session import SessionContext
+
+
+@pytest.fixture(autouse=True)
+def _bypass_rate_limit():
+    app.dependency_overrides[enforce_rate_limit] = lambda: SessionContext(
+        session_id="test-session", ip="127.0.0.1"
+    )
+    yield
+    app.dependency_overrides.pop(enforce_rate_limit, None)
+
+
 
 
 async def test_extract_keyword_success(monkeypatch):

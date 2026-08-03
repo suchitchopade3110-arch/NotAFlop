@@ -37,3 +37,9 @@ def fake_redis():
     server = fakeredis.aioredis.FakeServer()
     client = fakeredis.aioredis.FakeRedis(server=server, decode_responses=True)
     yield client
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter_memory():
+    from services import rate_limiter
+    rate_limiter._memory_store.clear()
