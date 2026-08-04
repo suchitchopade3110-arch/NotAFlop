@@ -56,7 +56,11 @@ _background_tasks: set[asyncio.Task] = set()
 
 async def run_agents_node(state: GraphState) -> GraphState:
     """Fan-out: run all 11 agents in parallel, collect results."""
-    tasks = [agent.run(state) for agent in ALL_AGENTS]
+    tasks = []
+    for i, agent in enumerate(ALL_AGENTS):
+        if i > 0:
+            await asyncio.sleep(0.2)
+        tasks.append(agent.run(state))
     outputs: list[AgentOutput] = await asyncio.gather(*tasks, return_exceptions=True)
 
     results = {}
@@ -205,7 +209,11 @@ async def _run_pipeline(
         "errors": [],
     }
 
-    tasks = {agent.name: asyncio.create_task(agent.run(initial_state)) for agent in ALL_AGENTS}
+    tasks: dict[str, asyncio.Task] = {}
+    for i, agent in enumerate(ALL_AGENTS):
+        if i > 0:
+            await asyncio.sleep(0.2)
+        tasks[agent.name] = asyncio.create_task(agent.run(initial_state))
     results: dict[str, AgentOutput] = {}
     errors: list[str] = []
     pending = dict(tasks)

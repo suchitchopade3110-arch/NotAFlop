@@ -11,8 +11,12 @@ PH_GRAPHQL = "https://api.producthunt.com/v2/api/graphql"
 
 
 async def fetch(keyword: str) -> dict:
-    return _stub(keyword)
-    # return await _fetch_live(keyword)
+    if not PH_API_KEY:
+        return {"source": "product_hunt", "status": "unavailable", "reason": "PRODUCT_HUNT_API_KEY not configured"}
+    try:
+        return await _fetch_live(keyword)
+    except Exception as e:
+        return {"source": "product_hunt", "status": "unavailable", "reason": f"live fetch failed: {e}"}
 
 
 def _stub(keyword: str) -> dict:

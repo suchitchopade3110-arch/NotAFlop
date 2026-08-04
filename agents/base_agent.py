@@ -19,7 +19,8 @@ class BaseAgent(ABC):
     def build_user_message(self, state: dict) -> str:
         return (
             f"Founder pitch:\n\"\"\"\n{state['transcript']}\n\"\"\"\n\n"
-            f"Market signals:\n{json.dumps(state['signals'], indent=2)}"
+            f"Market signals:\n{json.dumps(state['signals'], indent=2)}\n\n"
+            "Note: If any market signal source has status 'unavailable', treat that source as missing/unverified data. Do not hallucinate or assume signal values for unavailable sources."
         )
 
     async def run(self, state: dict) -> AgentOutput:

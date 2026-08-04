@@ -12,10 +12,12 @@ ACTOR_ID = "emastra~google-trends-scraper"
 
 async def fetch(keyword: str) -> dict:
     """Returns trend trajectory for keyword."""
-    # ── STUB ─────────────────────────────────────────────────
-    return _stub(keyword)
-    # ── LIVE (uncomment when key is ready) ───────────────────
-    # return await _fetch_live(keyword)
+    if not APIFY_API_KEY:
+        return {"source": "google_trends", "status": "unavailable", "reason": "APIFY_API_KEY not configured"}
+    try:
+        return await _fetch_live(keyword)
+    except Exception as e:
+        return {"source": "google_trends", "status": "unavailable", "reason": f"live fetch failed: {e}"}
 
 
 def _stub(keyword: str) -> dict:

@@ -11,8 +11,12 @@ REDDIT_USER_AGENT = "notaflop-validator/0.1"
 
 
 async def fetch(keyword: str) -> dict:
-    return _stub(keyword)
-    # return await _fetch_live(keyword)
+    if not REDDIT_CLIENT_ID or not REDDIT_CLIENT_SECRET:
+        return {"source": "reddit", "status": "unavailable", "reason": "REDDIT_CLIENT_ID/SECRET not configured"}
+    try:
+        return await _fetch_live(keyword)
+    except Exception as e:
+        return {"source": "reddit", "status": "unavailable", "reason": f"live fetch failed: {e}"}
 
 
 def _stub(keyword: str) -> dict:

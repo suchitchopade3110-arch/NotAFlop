@@ -16,7 +16,8 @@ async def _fetch_with_cache(source_name: str, fetcher, keyword: str) -> dict:
         return cached
 
     data = await fetcher(keyword)
-    await cache.set_cached(source_name, keyword, data)
+    if isinstance(data, dict) and data.get("status") != "unavailable":
+        await cache.set_cached(source_name, keyword, data)
     return data
 
 
@@ -39,7 +40,7 @@ async def gather_signals(keyword: str) -> dict:
 
     for name, result in zip(sources, results):
         if isinstance(result, Exception):
-            signals[name] = {"source": name, "error": str(result)}
+            signals[name] = {"source": name, "status": "unavailable", "reason": f"live fetch failed: {result}"}
         else:
             signals[name] = result
 

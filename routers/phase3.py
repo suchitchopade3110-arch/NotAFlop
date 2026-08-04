@@ -38,6 +38,17 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforc
     if not body.transcript.strip():
         raise HTTPException(status_code=400, detail="Transcript is empty.")
 
+    # TODO: Revisit making filter_result required once frontend reliably passes it on every call.
+    if body.filter_result and body.filter_result.get("verdict") == "fail":
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This pitch didn't pass Phase 1 filtering "
+                f"({body.filter_result.get('feedback', 'clarity or problem specificity too weak')}). "
+                "Revise the pitch and re-run Phase 1 before analyzing."
+            ),
+        )
+
     keyword = (body.keyword or "").strip()
     if not keyword:
         try:

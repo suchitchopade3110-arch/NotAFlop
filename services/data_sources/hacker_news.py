@@ -9,8 +9,10 @@ HN_ALGOLIA = "https://hn.algolia.com/api/v1/search"
 
 
 async def fetch(keyword: str) -> dict:
-    return _stub(keyword)
-    # return await _fetch_live(keyword)
+    try:
+        return await _fetch_live(keyword)
+    except Exception as e:
+        return {"source": "hacker_news", "status": "unavailable", "reason": f"live fetch failed: {e}"}
 
 
 def _stub(keyword: str) -> dict:

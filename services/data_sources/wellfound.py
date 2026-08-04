@@ -6,8 +6,7 @@ To activate: implement _fetch_live() with httpx + BeautifulSoup or Apify actor.
 
 
 async def fetch(keyword: str) -> dict:
-    return _stub(keyword)
-    # return await _fetch_live(keyword)
+    return {"source": "wellfound", "status": "unavailable", "reason": "live scraper not yet implemented"}
 
 
 def _stub(keyword: str) -> dict:
