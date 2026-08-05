@@ -5,3 +5,6 @@ venv/
 .env
 *.log
 .pytest_cache/
+
+*.log
+uvicorn.*.log
