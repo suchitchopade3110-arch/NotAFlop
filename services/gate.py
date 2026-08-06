@@ -4,14 +4,43 @@ Single source of truth for VC-weighted scoring, verdict, and gate reasoning.
 Consumed by Phase 3's orchestrator (for the inline SSE 'final' event) and by
 the standalone Phase 4 /gate endpoint (for a clean, re-computable verdict).
 
-WEIGHTS is versioned (core.config.WEIGHTS_VERSION) — bump the version
-any time a weight changes or an agent is added/removed. aggregate_results
-divides by the dynamically-summed weight of whatever agents are present,
-so adding a new weighted agent measurably dilutes every existing agent's
-share of the final score; that's expected, not a bug, but it does mean
-scores computed under different WEIGHTS_VERSIONs aren't directly
-comparable. Reports persist each agent's raw score specifically so they
-can be re-aggregated under a different WEIGHTS_VERSION retroactively.
+WEIGHTS_VERSION lives here, next to the WEIGHTS it versions, and is stamped
+onto every persisted report at write time (never inferred at read) — bump
+it any time a weight changes, an agent is added/removed, or the aggregation
+arithmetic itself changes.
+
+Weighting arithmetic, spelled out because additive and renormalized are NOT
+numerically equivalent for a given weight value:
+
+  aggregate_results() computes weighted_sum / weight_total, where
+  weight_total is the dynamic sum of the weights of whichever agents are
+  PRESENT in a given call. That dynamic denominator does two distinct jobs
+  that are easy to conflate:
+
+  1. Missing-agent tolerance (orthogonal to versioning, always been true):
+     if an agent errored out and is absent from `results`, its weight
+     drops out of both the numerator and the denominator, so the average
+     is computed over whoever's actually present instead of being dragged
+     down by phantom zeros. This has nothing to do with lovers_test.
+
+  2. How lovers_test (added at WEIGHTS_VERSION 2) was folded in: it was
+     APPENDED to WEIGHTS at 0.85, not carved out of the original 10
+     weights' fixed budget. The other 10 weights are byte-for-byte
+     unchanged from v1 (they still sum to 10.50 on their own) — adding
+     lovers_test only grows weight_total when it's present, which dilutes
+     everyone else's *share* of the final score without rescaling anyone's
+     individual weight. That's additive, confirmed against the actual
+     arithmetic: 11 agents at 8/10 with lovers_test absent scores 80;
+     the same 11 plus lovers_test at 2/10 scores 76 (weighted_sum=85.7,
+     weight_total=11.35, 85.7/11.35*10=75.5..., rounds to 76). A true
+     renormalization — rescaling the original 10 weights so lovers_test
+     carves a slice out of a fixed 10.50 budget instead of growing it —
+     would score 75 for that same example instead. 76 is what the code
+     produces; see tests/test_gate.py for the pinned worked example.
+
+  Reports persist each agent's raw score specifically so they can be
+  re-aggregated under a different WEIGHTS_VERSION retroactively; scores
+  computed under different WEIGHTS_VERSIONs aren't directly comparable.
 """
 import logging
 
@@ -19,6 +48,8 @@ from models.documents import VerifierOutput
 from orchestrator.state import AgentOutput
 
 logger = logging.getLogger("notaflop.gate")
+
+WEIGHTS_VERSION = 2  # bump on any change to WEIGHTS below, or to the aggregation arithmetic itself
 
 WEIGHTS: dict[str, float] = {
     "problem": 1.20,
@@ -32,7 +63,7 @@ WEIGHTS: dict[str, float] = {
     "timing": 0.95,
     "ask": 0.80,
     "yc_signal": 1.00,
-    "lovers_test": 0.85,  # added in WEIGHTS_VERSION 2 — additive, not renormalized (see core.config)
+    "lovers_test": 0.85,  # added in WEIGHTS_VERSION 2 — additive, not renormalized (see module docstring)
 }
 
 GO_THRESHOLD = 70

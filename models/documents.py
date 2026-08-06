@@ -45,6 +45,7 @@ class VerifierOutput(BaseModel):
 class ReportDocument(BaseModel):
     public_id: str
     session_id: str
+    account_id: str | None = None  # nullable, unused until Stage C's account/auth work lands
     ip: str | None = None
 
     idea_hash: str
@@ -70,6 +71,7 @@ class ReportDocument(BaseModel):
 
 class SessionDocument(BaseModel):
     session_id: str
+    account_id: str | None = None  # nullable, unused until Stage C's account/auth work lands
     ip: str | None = None
     report_count: int = 0
 

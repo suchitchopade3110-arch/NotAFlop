@@ -1,6 +1,5 @@
-from core.config import WEIGHTS_VERSION
 from orchestrator.state import AgentOutput
-from services.gate import WEIGHTS, aggregate_results
+from services.gate import WEIGHTS, WEIGHTS_VERSION, aggregate_results
 
 
 def _output(name: str, score: int) -> AgentOutput:
