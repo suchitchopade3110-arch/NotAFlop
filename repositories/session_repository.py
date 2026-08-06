@@ -28,6 +28,7 @@ async def ensure_indexes() -> None:
     try:
         await coll.create_index([("session_id", ASCENDING)], unique=True)
         await coll.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
+        await coll.create_index([("account_id", ASCENDING)])
     except PyMongoError:
         mongo.mark_unavailable(RuntimeError("index creation failed on sessions"))
 
@@ -49,6 +50,7 @@ async def get_or_create_session(session_id: str, ip: str | None) -> SessionDocum
                 "$set": {"last_seen_at": now, "expires_at": expires_at},
                 "$setOnInsert": {
                     "session_id": session_id,
+                    "account_id": None,
                     "ip": ip,
                     "created_at": now,
                     "report_count": 0,

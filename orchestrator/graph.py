@@ -38,12 +38,12 @@ except ModuleNotFoundError:
 
 from agents import verifier as verifier_agent
 from agents.specialist_agents import ALL_AGENTS
-from core.config import VERIFIER_PENALTY_ENABLED, WEIGHTS_VERSION
+from core.config import VERIFIER_PENALTY_ENABLED
 from core.ids import generate_public_id
 from models.documents import AgentResultRecord, ReportDocument, VerifierOutput
 from orchestrator.state import AgentOutput, GraphState
 from repositories import report_repository, session_repository
-from services.gate import PIVOT_THRESHOLD, aggregate_results, apply_verifier_penalty
+from services.gate import PIVOT_THRESHOLD, WEIGHTS_VERSION, aggregate_results, apply_verifier_penalty
 
 logger = logging.getLogger("notaflop.orchestrator")
 

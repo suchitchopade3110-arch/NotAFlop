@@ -28,5 +28,5 @@ RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", str(24 * 
 # Verifier
 VERIFIER_PENALTY_ENABLED: bool = os.getenv("VERIFIER_PENALTY_ENABLED", "false").lower() == "true"
 
-# Scoring
-WEIGHTS_VERSION = 2  # bump on any change to services/gate.py WEIGHTS
+# Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
+# it versions, instead of here — stamped on every report at write time.
