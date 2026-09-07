@@ -8,6 +8,7 @@ def _make_criterion(criterion_id="crit_0000000001", idea_id="idea_1", deadline=N
     return CriterionDocument(
         criterion_id=criterion_id,
         idea_id=idea_id,
+        session_id="sess1",
         statement="If fewer than 10 of 30 cold-emailed vets reply positively, pivot.",
         metric="positive vet replies",
         threshold=">= 10 of 30",

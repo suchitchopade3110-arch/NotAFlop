@@ -47,7 +47,7 @@ def _idea(account_id=None) -> IdeaDocument:
 
 def _snapshot(deltas: dict) -> SnapshotDocument:
     return SnapshotDocument(
-        snapshot_id="snap_notify1", idea_id="idea_notify1", agent_scores={"timing": 8},
+        snapshot_id="snap_notify1", idea_id="idea_notify1", session_id="sess1", agent_scores={"timing": 8},
         raw_score=70, verdict="go", weights_version=2, trigger="scheduled", deltas=deltas,
     )
 
@@ -99,7 +99,7 @@ async def test_notify_snapshot_version_crossing_noted_in_body(mongo_db):
     await account_repository.create_account(AccountDocument(account_id="acct_1", email="founder@example.com"))
     idea = _idea(account_id="acct_1")
     snapshot = SnapshotDocument(
-        snapshot_id="snap_notify2", idea_id="idea_notify1", agent_scores={"timing": 8},
+        snapshot_id="snap_notify2", idea_id="idea_notify1", session_id="sess1", agent_scores={"timing": 8},
         raw_score=70, verdict="go", weights_version=3, trigger="scheduled",
         deltas={"raw_score": 5, "dimensions": {"timing": 5}}, version_crossing=True,
     )
@@ -116,7 +116,7 @@ async def test_criteria_deadline_reminder_suppressed_when_unclaimed(mongo_db):
 
     idea = _idea(account_id=None)
     criterion = CriterionDocument(
-        criterion_id="crit_notify1", idea_id=idea.idea_id, statement="s", metric="m",
+        criterion_id="crit_notify1", idea_id=idea.idea_id, session_id="sess1", statement="s", metric="m",
         threshold="t", deadline=dt.datetime.now(dt.timezone.utc),
     )
     sent = await notifications.send_criteria_deadline_reminder(idea, criterion)
@@ -133,7 +133,7 @@ async def test_criteria_deadline_reminder_sent_when_claimed(mongo_db):
     await account_repository.create_account(AccountDocument(account_id="acct_1", email="founder@example.com"))
     idea = _idea(account_id="acct_1")
     criterion = CriterionDocument(
-        criterion_id="crit_notify2", idea_id=idea.idea_id, statement="Ship a demo",
+        criterion_id="crit_notify2", idea_id=idea.idea_id, session_id="sess1", statement="Ship a demo",
         metric="demo shipped", threshold="yes/no", deadline=dt.datetime.now(dt.timezone.utc),
     )
 

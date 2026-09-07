@@ -6,6 +6,7 @@ def _make_evidence(evidence_id="ev_0000000001", idea_id="idea_1") -> EvidenceDoc
     return EvidenceDocument(
         evidence_id=evidence_id,
         idea_id=idea_id,
+        session_id="sess1",
         type="waitlist",
         payload={"count": 120, "source": "landing page"},
     )

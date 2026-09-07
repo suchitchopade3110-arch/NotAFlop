@@ -160,12 +160,14 @@ async def test_delete_idea_cascade_removes_everything(mongo_db):
     )
     await criteria_repository.create_criterion(
         CriterionDocument(
-            criterion_id="crit_del1", idea_id=idea.idea_id, statement="s", metric="m",
+            criterion_id="crit_del1", idea_id=idea.idea_id, session_id="sess1", statement="s", metric="m",
             threshold="t", deadline=datetime.now(timezone.utc) + timedelta(days=1),
         )
     )
     await evidence_repository.create_evidence(
-        EvidenceDocument(evidence_id="ev_del1", idea_id=idea.idea_id, type="waitlist", payload={})
+        EvidenceDocument(
+            evidence_id="ev_del1", idea_id=idea.idea_id, session_id="sess1", type="waitlist", payload={}
+        )
     )
 
     assert await log_service.delete_idea_cascade(idea.idea_id) is True

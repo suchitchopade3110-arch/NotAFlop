@@ -52,8 +52,8 @@ async def create_criterion(
     CriterionRequest's own field_validators (models/schemas.py) enforce
     a non-trivial statement/metric/threshold and a future deadline. A
     commitment that cannot fail is not a commitment."""
-    await _get_owned_idea_or_404(idea_id, owner)
-    criterion = await criteria_service.create_criterion(idea_id, body)
+    idea = await _get_owned_idea_or_404(idea_id, owner)
+    criterion = await criteria_service.create_criterion(idea, body)
     if criterion is None:
         raise HTTPException(status_code=503, detail="Could not save criterion. Try again.")
     return _to_response(criterion)

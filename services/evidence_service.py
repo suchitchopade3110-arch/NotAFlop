@@ -20,7 +20,12 @@ async def submit_evidence(
     idea: IdeaDocument, body: EvidenceRequest
 ) -> tuple[EvidenceDocument, SnapshotDocument | None] | None:
     evidence = EvidenceDocument(
-        evidence_id=generate_evidence_id(), idea_id=idea.idea_id, type=body.type, payload=body.payload,
+        evidence_id=generate_evidence_id(),
+        idea_id=idea.idea_id,
+        session_id=idea.session_id,
+        account_id=idea.account_id,
+        type=body.type,
+        payload=body.payload,
     )
     if not await evidence_repository.create_evidence(evidence):
         return None

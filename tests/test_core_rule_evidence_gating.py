@@ -185,7 +185,7 @@ async def test_resolved_kill_criterion_triggers_a_rescore(mongo_db, monkeypatch)
     _patch_agents(monkeypatch, {"solution": 9})
 
     criterion = await criteria_service.create_criterion(
-        idea.idea_id,
+        idea,
         CriterionRequest(
             statement="If fewer than 10/30 cold-emailed vets reply positively, pivot.",
             metric="positive vet replies",

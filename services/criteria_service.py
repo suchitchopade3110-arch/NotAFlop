@@ -22,10 +22,12 @@ from services.notifications import service as notifications
 logger = get_logger("notaflop.criteria_service")
 
 
-async def create_criterion(idea_id: str, body: CriterionRequest) -> CriterionDocument | None:
+async def create_criterion(idea: IdeaDocument, body: CriterionRequest) -> CriterionDocument | None:
     criterion = CriterionDocument(
         criterion_id=generate_criterion_id(),
-        idea_id=idea_id,
+        idea_id=idea.idea_id,
+        session_id=idea.session_id,
+        account_id=idea.account_id,
         statement=body.statement,
         metric=body.metric,
         threshold=body.threshold,
@@ -55,6 +57,8 @@ async def resolve_criterion(
     evidence = EvidenceDocument(
         evidence_id=generate_evidence_id(),
         idea_id=idea.idea_id,
+        session_id=idea.session_id,
+        account_id=idea.account_id,
         type="criterion_resolution",
         payload={
             "criterion_id": criterion.criterion_id,

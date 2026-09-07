@@ -69,6 +69,8 @@ async def promote_report_to_idea(
     snapshot = SnapshotDocument(
         snapshot_id=generate_snapshot_id(),
         idea_id=idea.idea_id,
+        session_id=idea.session_id,
+        account_id=idea.account_id,
         agent_scores={name: record.score for name, record in report.agent_results.items()},
         raw_score=report.raw_score,
         adjusted_score=report.adjusted_score,
@@ -201,6 +203,8 @@ async def record_snapshot(
     snapshot = SnapshotDocument(
         snapshot_id=generate_snapshot_id(),
         idea_id=idea.idea_id,
+        session_id=idea.session_id,
+        account_id=idea.account_id,
         agent_scores=merged_scores,
         raw_score=raw_score,
         # Phase 2 re-runs never invoke the Verifier — it's outside every

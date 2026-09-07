@@ -6,6 +6,7 @@ def _make_snapshot(snapshot_id="snap_0000000001", idea_id="idea_1", raw_score=70
     return SnapshotDocument(
         snapshot_id=snapshot_id,
         idea_id=idea_id,
+        session_id="sess1",
         agent_scores={"problem": 8, "solution": 7},
         raw_score=raw_score,
         verdict="go",

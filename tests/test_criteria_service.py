@@ -61,7 +61,7 @@ async def test_create_criterion(mongo_db):
         threshold=">= 10 of 30",
         deadline=_future_deadline(),
     )
-    criterion = await criteria_service.create_criterion(idea.idea_id, body)
+    criterion = await criteria_service.create_criterion(idea, body)
     assert criterion is not None
     assert criterion.status == "pending"
 
@@ -69,7 +69,7 @@ async def test_create_criterion(mongo_db):
 async def test_list_criteria(mongo_db):
     idea = await _seed_idea()
     body = CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=_future_deadline())
-    await criteria_service.create_criterion(idea.idea_id, body)
+    await criteria_service.create_criterion(idea, body)
     listed = await criteria_service.list_criteria(idea.idea_id)
     assert len(listed) == 1
 
@@ -82,7 +82,7 @@ async def test_resolve_criterion_writes_evidence_and_rescores(mongo_db, monkeypa
         statement="If fewer than 10/30 vets reply positively, pivot.",
         metric="positive replies", threshold=">= 10 of 30", deadline=_future_deadline(),
     )
-    criterion = await criteria_service.create_criterion(idea.idea_id, body)
+    criterion = await criteria_service.create_criterion(idea, body)
 
     result = await criteria_service.resolve_criterion(criterion, idea, "met", "14 of 30 replied positively.")
     assert result is not None
@@ -107,7 +107,7 @@ async def test_resolve_criterion_writes_evidence_and_rescores(mongo_db, monkeypa
 async def test_sweep_lapsed_criteria_transitions_overdue(mongo_db):
     idea = await _seed_idea()
     past = CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=_future_deadline(days=1))
-    criterion = await criteria_service.create_criterion(idea.idea_id, past)
+    criterion = await criteria_service.create_criterion(idea, past)
 
     # Backdate the deadline directly (CriterionRequest itself rejects a
     # past deadline at the API boundary).
@@ -125,7 +125,7 @@ async def test_sweep_lapsed_criteria_transitions_overdue(mongo_db):
 async def test_sweep_ignores_future_deadlines(mongo_db):
     idea = await _seed_idea()
     future = CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=_future_deadline())
-    await criteria_service.create_criterion(idea.idea_id, future)
+    await criteria_service.create_criterion(idea, future)
 
     assert await criteria_service.sweep_lapsed_criteria() == 0
 
@@ -158,11 +158,11 @@ async def test_sweep_deadline_reminders_sends_only_to_claimed_ideas(mongo_db, mo
 
     soon = _future_deadline(days=1)
     await criteria_service.create_criterion(
-        claimed_idea.idea_id,
+        claimed_idea,
         CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=soon),
     )
     await criteria_service.create_criterion(
-        unclaimed_idea.idea_id,
+        unclaimed_idea,
         CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=soon),
     )
 

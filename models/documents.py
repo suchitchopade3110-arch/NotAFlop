@@ -181,6 +181,15 @@ class SnapshotDocument(BaseModel):
 
     snapshot_id: str
     idea_id: str
+    # Constraint #3: every persisted document carries session_id and a
+    # nullable account_id — denormalized from the owning idea at write
+    # time (never re-synced retroactively on a later claim, same as
+    # ReportDocument.account_id already behaves: a claim only updates
+    # documents written after it, not before — see idea_repository.owns
+    # for how a claimed idea's OWN ownership check still works correctly
+    # regardless).
+    session_id: str
+    account_id: str | None = None
     agent_scores: dict[str, int] = Field(default_factory=dict)
     raw_score: int
     adjusted_score: int | None = None
@@ -216,6 +225,9 @@ class CriterionDocument(BaseModel):
 
     criterion_id: str
     idea_id: str
+    # Constraint #3 — see SnapshotDocument's field comment.
+    session_id: str
+    account_id: str | None = None
     statement: str
     metric: str
     threshold: str
@@ -237,6 +249,9 @@ class EvidenceDocument(BaseModel):
 
     evidence_id: str
     idea_id: str
+    # Constraint #3 — see SnapshotDocument's field comment.
+    session_id: str
+    account_id: str | None = None
     type: Literal[
         "interview", "waitlist", "revenue", "letter_of_intent", "criterion_resolution", "other"
     ]

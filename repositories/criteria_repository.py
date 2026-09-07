@@ -30,6 +30,8 @@ async def ensure_indexes() -> None:
         await coll.create_index([("idea_id", ASCENDING)])
         await coll.create_index([("deadline", ASCENDING)])
         await coll.create_index([("status", ASCENDING)])
+        await coll.create_index([("session_id", ASCENDING)])
+        await coll.create_index([("account_id", ASCENDING)])
     except PyMongoError:
         mongo.mark_unavailable(RuntimeError("index creation failed on criteria"))
 
