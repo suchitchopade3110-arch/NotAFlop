@@ -7,7 +7,7 @@ from core.config import FILTER_MODEL
 async def test_narrow_problem_pins_temperature_zero(monkeypatch):
     captured = {}
 
-    async def _fake_chat(model, system, user, max_tokens, temperature=None):
+    async def _fake_chat(model, system, user, max_tokens, temperature=None, **kwargs):
         captured["temperature"] = temperature
         return json.dumps({"passed": True, "score": 8, "feedback": "Specific enough."})
 
@@ -20,7 +20,7 @@ async def test_narrow_problem_pins_temperature_zero(monkeypatch):
 async def test_pitch_clarity_pins_temperature_zero(monkeypatch):
     captured = {}
 
-    async def _fake_chat(model, system, user, max_tokens, temperature=None):
+    async def _fake_chat(model, system, user, max_tokens, temperature=None, **kwargs):
         captured["temperature"] = temperature
         return json.dumps({"passed": True, "score": 8, "feedback": "Clear pitch."})
 

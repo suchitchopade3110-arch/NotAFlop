@@ -21,7 +21,7 @@ def test_system_prompt_mentions_reddit_hn_signal_language():
 
 
 async def test_run_parses_valid_response(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         return json.dumps({"score": 9, "evidence": "142 frustrated Reddit posts", "feedback": "Strong love."})
 
     monkeypatch.setattr("agents.base_agent.chat", _fake_chat)
@@ -38,7 +38,7 @@ async def test_run_parses_valid_response(monkeypatch):
 
 
 async def test_run_degrades_on_malformed_response(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         return "not json"
 
     monkeypatch.setattr("agents.base_agent.chat", _fake_chat)

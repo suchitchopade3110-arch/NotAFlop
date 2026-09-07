@@ -24,7 +24,7 @@ async def extract_keyword(transcript: str) -> str:
     if not transcript or not transcript.strip():
         raise KeywordExtractionError("Transcript is empty.")
 
-    raw = await chat(FILTER_MODEL, KEYWORD_PROMPT, transcript.strip(), max_tokens=50)
+    raw = await chat(FILTER_MODEL, KEYWORD_PROMPT, transcript.strip(), max_tokens=50, agent_name="keyword_extractor")
     keyword = raw.strip().strip('"\'`')
 
     # Validation: empty, under 3 chars, or over 8 words
