@@ -19,7 +19,15 @@ from dataclasses import dataclass
 
 from redis.exceptions import RedisError
 
-from core.config import RATE_LIMIT_IP_MAX, RATE_LIMIT_SESSION_MAX, RATE_LIMIT_WINDOW_SECONDS
+from core.config import (
+    RATE_LIMIT_IP_MAX,
+    RATE_LIMIT_SESSION_MAX,
+    RATE_LIMIT_WINDOW_SECONDS,
+    SHARE_CARD_RATE_LIMIT_MAX,
+    SHARE_CARD_RATE_LIMIT_WINDOW_SECONDS,
+    SNAPSHOT_MANUAL_RERUN_MAX,
+    SNAPSHOT_MANUAL_RERUN_WINDOW_SECONDS,
+)
 from core.logging import get_logger
 from services.cache import get_client
 
@@ -106,3 +114,25 @@ async def check_rate_limit(session_id: str, ip: str) -> RateLimitResult:
         return ip_result
 
     return session_result
+
+
+async def check_snapshot_rerun_rate_limit(idea_id: str) -> RateLimitResult:
+    """Independent of check_rate_limit's validation caps (constraint:
+    'rate limited independently of validation') — a founder forcing a
+    re-run on one idea's log doesn't touch their validation quota, and
+    vice versa. Scoped per idea, not per session, so it caps cost on the
+    idea itself regardless of who's driving it."""
+    return await _check_one(
+        "idea_snapshot",
+        f"ratelimit:snapshot:{idea_id}",
+        SNAPSHOT_MANUAL_RERUN_MAX,
+        SNAPSHOT_MANUAL_RERUN_WINDOW_SECONDS,
+    )
+
+
+async def check_share_card_rate_limit(ip: str) -> RateLimitResult:
+    """B2's GET /v1/share/{token} — no session/auth on this route at
+    all, so ip is the only scope available to cap it."""
+    return await _check_one(
+        "share_card", f"ratelimit:share:{ip}", SHARE_CARD_RATE_LIMIT_MAX, SHARE_CARD_RATE_LIMIT_WINDOW_SECONDS,
+    )

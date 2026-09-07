@@ -6,9 +6,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.cors import resolve_cors_origins
 from core.logging import configure_logging
 from core.middleware import RequestIDMiddleware
-from repositories import report_repository, session_repository
-from routers import internal, phase1, phase2, phase3, phase4, phase5, reports
-from services import health, mongo
+from repositories import (
+    account_repository,
+    criteria_repository,
+    evidence_repository,
+    idea_repository,
+    report_repository,
+    session_repository,
+    snapshot_repository,
+)
+from core.config import SNAPSHOT_SCHEDULER_ENABLED
+from routers import (
+    internal,
+    phase1,
+    phase2,
+    phase3,
+    phase4,
+    phase5,
+    reports,
+    v1_auth,
+    v1_criteria,
+    v1_evidence,
+    v1_ideas,
+    v1_share,
+)
+from services import health, mongo, scheduler
 
 configure_logging()
 
@@ -18,7 +40,22 @@ async def lifespan(app: FastAPI):
     await mongo.connect()
     await report_repository.ensure_indexes()
     await session_repository.ensure_indexes()
+    # Phase 2 (additive) — evidence-log collections.
+    await account_repository.ensure_indexes()
+    await idea_repository.ensure_indexes()
+    await snapshot_repository.ensure_indexes()
+    await criteria_repository.ensure_indexes()
+    await evidence_repository.ensure_indexes()
+
+    # C1: background snapshot scheduler — off by default (dev/test), see
+    # services/scheduler.py's module docstring.
+    if SNAPSHOT_SCHEDULER_ENABLED:
+        scheduler.start()
+
     yield
+
+    if SNAPSHOT_SCHEDULER_ENABLED:
+        await scheduler.stop()
     await mongo.disconnect()
 
 
@@ -39,6 +76,14 @@ app.include_router(phase4.router, prefix="/api/phase4", tags=["Phase 4 - Gate"])
 app.include_router(phase5.router, prefix="/api/phase5", tags=["Phase 5 - Plan & Build"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
 app.include_router(internal.router, prefix="/internal", tags=["Internal"])
+
+# Phase 2 — everything new is namespaced under /v1, existing routes above
+# are untouched (constraint #2).
+app.include_router(v1_auth.router, prefix="/v1", tags=["Phase 2 - Identity"])
+app.include_router(v1_ideas.router, prefix="/v1", tags=["Phase 2 - Ideas"])
+app.include_router(v1_share.router, prefix="/v1", tags=["Phase 2 - Share"])
+app.include_router(v1_criteria.router, prefix="/v1", tags=["Phase 2 - Kill Criteria"])
+app.include_router(v1_evidence.router, prefix="/v1", tags=["Phase 2 - Evidence & Milestones"])
 
 
 @app.get("/health")

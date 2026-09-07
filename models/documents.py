@@ -103,3 +103,158 @@ class FeedbackDocument(BaseModel):
     rating: int
     comment: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Phase 2: the evidence log ────────────────────────────────────────
+#
+# Five collections (accounts, ideas, snapshots, criteria, evidence),
+# additive to the v1 reports/sessions above — see A1's audit for how they
+# relate: `reports` stays the untouched v1 pipeline artifact; an `idea` is
+# created by *promoting* a completed report (POST /v1/ideas), and every
+# score written after that point is a `snapshot`, owned exclusively by
+# services/log_service.py (constraint #6 — no other module writes here).
+#
+# `milestones` is not a 6th top-level collection (the task's schema table
+# lists exactly five) — it's embedded on IdeaDocument as MilestoneRecord,
+# each carrying its own id for PATCH /v1/milestones/{mid}.
+
+
+class AccountDocument(BaseModel):
+    account_id: str
+    email: str
+    created_at: datetime = Field(default_factory=_utcnow)
+    plan: Literal["free", "pro"] = "free"
+    session_ids: list[str] = Field(default_factory=list)
+
+
+class MilestoneRecord(BaseModel):
+    """One roadmap block, with completion state — embedded on
+    IdeaDocument rather than its own collection (see module docstring)."""
+
+    milestone_id: str
+    day_range: str
+    block_title: str
+    tasks: list[str] = Field(default_factory=list)
+    deliverable: str
+    completed: bool = False
+    completed_at: datetime | None = None
+    evidence_id: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class IdeaDocument(BaseModel):
+    """A durable, re-runnable idea log. `idea_hash` is an index only —
+    never a cache short-circuit (see repositories/idea_repository.py):
+    two founders pitching the same idea_hash each get their own
+    IdeaDocument and independent score history."""
+
+    idea_id: str
+    session_id: str
+    account_id: str | None = None
+    idea_hash: str
+    raw_text: str
+    normalized_text: str
+    keyword: str = ""
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+    current_snapshot_id: str | None = None
+    share_token: str
+    status: Literal["active", "archived", "deleted"] = "active"
+    # The v1 report this idea was promoted from (POST /v1/ideas) — kept
+    # for traceability only; the idea's own snapshot history is what
+    # everything past promotion reads from, never this report again.
+    source_report_id: str | None = None
+    milestones: list[MilestoneRecord] = Field(default_factory=list)
+    # C1 idempotency: a short-TTL lock so a scheduler tick and a manual
+    # force-re-run (or two overlapping sweeps) can't both run a re-score
+    # for the same idea at once. None/expired = free to acquire.
+    scheduler_lock_until: datetime | None = None
+
+
+class SnapshotDocument(BaseModel):
+    """One point-in-time score. Immutable once written — a re-score never
+    edits a prior snapshot (see C7); it only ever appends a new one.
+    `raw_score` gates (tier/verdict logic); `adjusted_score` is carried
+    for parity with ReportDocument but Phase 2 re-runs don't invoke the
+    Verifier (out of the reduced re-run sets in C1), so it mirrors
+    raw_score unless a future phase changes that."""
+
+    snapshot_id: str
+    idea_id: str
+    # Constraint #3: every persisted document carries session_id and a
+    # nullable account_id — denormalized from the owning idea at write
+    # time (never re-synced retroactively on a later claim, same as
+    # ReportDocument.account_id already behaves: a claim only updates
+    # documents written after it, not before — see idea_repository.owns
+    # for how a claimed idea's OWN ownership check still works correctly
+    # regardless).
+    session_id: str
+    account_id: str | None = None
+    agent_scores: dict[str, int] = Field(default_factory=dict)
+    raw_score: int
+    adjusted_score: int | None = None
+    verdict: str
+    weights_version: int
+    sources: list[str] = Field(default_factory=list)
+    # The actual market-signals payload as of this snapshot (beyond the
+    # table's minimum fields, additive) — an evidence-gated re-run (C4)
+    # never refreshes the data layer, so it needs the previous snapshot's
+    # signals to feed the agents it does re-run; storing them here keeps
+    # that "carried forward, not re-derived on read" for signals too.
+    signals: dict = Field(default_factory=dict)
+    signal_quality: float = 0.0
+    conflicts: list[dict] = Field(default_factory=list)
+    trigger: Literal["initial", "scheduled", "evidence", "manual"] = "initial"
+    # Per-dimension + aggregate deltas against the previous snapshot,
+    # computed and stored at write time (C2) — never derived on read.
+    # Empty on the first (`initial`) snapshot, which has no predecessor.
+    deltas: dict = Field(default_factory=dict)
+    # True when this snapshot's weights_version differs from the
+    # snapshot it was diffed against — the delta is real but not a
+    # like-for-like movement, and callers must not present it as one.
+    version_crossing: bool = False
+    cost: float = 0.0
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class CriterionDocument(BaseModel):
+    """A falsifiable kill-criterion the founder commits to at validation
+    time. `metric` + `threshold` + `deadline` are all required at the API
+    boundary (routers/phase2_criteria.py) — a commitment with no way to
+    fail isn't a commitment."""
+
+    criterion_id: str
+    idea_id: str
+    # Constraint #3 — see SnapshotDocument's field comment.
+    session_id: str
+    account_id: str | None = None
+    statement: str
+    metric: str
+    threshold: str
+    deadline: datetime
+    status: Literal["pending", "met", "failed", "lapsed"] = "pending"
+    resolved_at: datetime | None = None
+    resolution_note: str | None = None
+    # C6: set once a deadline-approaching reminder has been sent, so the
+    # sweep never re-notifies the same criterion every tick.
+    reminder_sent_at: datetime | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class EvidenceDocument(BaseModel):
+    """Founder-submitted proof against the pitch — interviews, waitlist
+    numbers, revenue, letters of intent, or a kill-criterion's recorded
+    outcome. `triggered_snapshot_id` links back to the evidence-gated
+    snapshot this submission produced, once that re-score completes."""
+
+    evidence_id: str
+    idea_id: str
+    # Constraint #3 — see SnapshotDocument's field comment.
+    session_id: str
+    account_id: str | None = None
+    type: Literal[
+        "interview", "waitlist", "revenue", "letter_of_intent", "criterion_resolution", "other"
+    ]
+    payload: dict = Field(default_factory=dict)
+    submitted_at: datetime = Field(default_factory=_utcnow)
+    triggered_snapshot_id: str | None = None
