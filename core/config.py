@@ -63,3 +63,31 @@ CORS_ALLOWED_ORIGINS_RAW: str = os.getenv("CORS_ALLOWED_ORIGINS", "")
 
 # Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
 # it versions, instead of here — stamped on every report at write time.
+
+# ── Phase 2: living verdict / evidence log ───────────────────────────
+# Marginal snapshot cost target (C1) — a re-run should cost roughly a
+# quarter of a full report. Purely observability (services.log_service
+# logs a warning above this, same non-gating spirit as report_cost_usd).
+SNAPSHOT_COST_WARN_THRESHOLD_USD: float = float(os.getenv("SNAPSHOT_COST_WARN_THRESHOLD_USD", "0.20"))
+
+# Re-run cadence for the scheduled snapshot worker (C1) — an idea is due
+# for a scheduled re-run once its latest snapshot is this many days old.
+SNAPSHOT_SCHEDULE_INTERVAL_DAYS: int = int(os.getenv("SNAPSHOT_SCHEDULE_INTERVAL_DAYS", "7"))
+
+# Feature flag: whether main.py's lifespan starts the background
+# scheduler loop that periodically sweeps due ideas/lapsed criteria.
+# Off by default (and in tests) — the worker functions are always
+# callable directly/on-demand (POST /v1/ideas/{id}/snapshots, the
+# internal sweep functions) regardless of this flag.
+SNAPSHOT_SCHEDULER_ENABLED: bool = os.getenv("SNAPSHOT_SCHEDULER_ENABLED", "false").lower() == "true"
+SNAPSHOT_SCHEDULER_INTERVAL_SECONDS: int = int(os.getenv("SNAPSHOT_SCHEDULER_INTERVAL_SECONDS", str(6 * 60 * 60)))
+
+# Progressive identity (A4).
+SESSION_CLAIM_TOKEN_TTL_SECONDS: int = int(os.getenv("SESSION_CLAIM_TOKEN_TTL_SECONDS", "900"))  # 15 min
+MAGIC_LINK_RATE_LIMIT_MAX: int = int(os.getenv("MAGIC_LINK_RATE_LIMIT_MAX", "5"))
+MAGIC_LINK_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("MAGIC_LINK_RATE_LIMIT_WINDOW_SECONDS", str(60 * 60)))
+FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
+
+# Idea/report retention for unclaimed (no account_id) ideas, in days —
+# claimed ideas persist indefinitely (see A4).
+UNCLAIMED_IDEA_TTL_DAYS: int = int(os.getenv("UNCLAIMED_IDEA_TTL_DAYS", "30"))
