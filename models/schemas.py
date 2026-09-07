@@ -86,6 +86,17 @@ class ReportSummary(BaseModel):
     created_at: datetime
 
 
+class VerifierDivergenceStats(BaseModel):
+    """GET /internal/verifier/stats — shadow-mode divergence between
+    raw_score and adjusted_score across stored report snapshots that
+    carry a Verifier result. Read-only observability, no gating."""
+
+    count: int
+    mean_absolute_delta: float
+    max_delta: int
+    distribution: dict[str, int]
+
+
 class RateLimitError(BaseModel):
     """Body of a 429 from the rate-limit dependency."""
 

@@ -127,6 +127,71 @@ async def list_by_session(session_id: str, limit: int = 20) -> list[ReportDocume
     return results
 
 
+_DIVERGENCE_BUCKETS: list[tuple[str, int, int]] = [
+    # (label, low, high) — inclusive on both ends, in absolute-delta points.
+    ("0", 0, 0),
+    ("1-5", 1, 5),
+    ("6-10", 6, 10),
+    ("11-20", 11, 20),
+    ("21+", 21, 100),
+]
+
+
+def _bucket_for(delta: int) -> str:
+    for label, low, high in _DIVERGENCE_BUCKETS:
+        if low <= delta <= high:
+            return label
+    return _DIVERGENCE_BUCKETS[-1][0]
+
+
+async def get_verifier_divergence_stats() -> dict:
+    """Shadow-mode divergence between raw_score and adjusted_score across
+    every stored snapshot that has a Verifier result. Read-only — computes
+    nothing that feeds back into gating; purely observability for A2.
+
+    Returns count=0 / mean=0.0 / max=0 / empty buckets when Mongo is down
+    or no snapshot has a Verifier result yet, rather than raising.
+    """
+    coll = _collection()
+    empty = {
+        "count": 0,
+        "mean_absolute_delta": 0.0,
+        "max_delta": 0,
+        "distribution": {label: 0 for label, _, _ in _DIVERGENCE_BUCKETS},
+    }
+    if coll is None:
+        return empty
+
+    try:
+        cursor = coll.find(
+            {"adjusted_score": {"$ne": None}, "verifier": {"$ne": None}},
+            {"raw_score": 1, "adjusted_score": 1},
+        )
+        docs = await cursor.to_list(length=None)
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
+        return empty
+
+    deltas = [
+        abs(doc["raw_score"] - doc["adjusted_score"])
+        for doc in docs
+        if doc.get("raw_score") is not None and doc.get("adjusted_score") is not None
+    ]
+    if not deltas:
+        return empty
+
+    distribution = {label: 0 for label, _, _ in _DIVERGENCE_BUCKETS}
+    for delta in deltas:
+        distribution[_bucket_for(delta)] += 1
+
+    return {
+        "count": len(deltas),
+        "mean_absolute_delta": round(sum(deltas) / len(deltas), 2),
+        "max_delta": max(deltas),
+        "distribution": distribution,
+    }
+
+
 async def patch_verifier(
     public_id: str,
     verifier: VerifierOutput,

@@ -28,5 +28,11 @@ RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", str(24 * 
 # Verifier
 VERIFIER_PENALTY_ENABLED: bool = os.getenv("VERIFIER_PENALTY_ENABLED", "false").lower() == "true"
 
+# Internal/admin endpoints (e.g. GET /internal/verifier/stats). Empty by
+# default, which fails the admin dependency closed (see
+# core.dependencies.require_admin) rather than leaving an internal route
+# open with no credential to check against.
+ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
+
 # Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
 # it versions, instead of here — stamped on every report at write time.

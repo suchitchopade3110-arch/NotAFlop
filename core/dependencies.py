@@ -2,12 +2,16 @@
 Cross-cutting FastAPI dependencies applied at the route level (not
 middleware) — so they only run on the endpoints that opt in.
 """
+import hmac
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, Header, HTTPException
 
+from core.config import ADMIN_API_KEY
 from core.session import SESSION_HEADER, SessionContext, get_session_context
 from services.rate_limiter import check_rate_limit
+
+ADMIN_KEY_HEADER = "X-Admin-Key"
 
 
 async def enforce_rate_limit(session: SessionContext = Depends(get_session_context)) -> SessionContext:
@@ -36,3 +40,15 @@ async def enforce_rate_limit(session: SessionContext = Depends(get_session_conte
         )
 
     return session
+
+
+async def require_admin(x_admin_key: str | None = Header(default=None, alias=ADMIN_KEY_HEADER)) -> None:
+    """Applied only to /internal endpoints. Fails closed: an unconfigured
+    ADMIN_API_KEY means the route always 503s rather than ever being
+    reachable with no credential to check. Constant-time comparison so a
+    correctly-shaped but wrong key can't be brute-forced via timing."""
+    if not ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin API is not configured.")
+
+    if not x_admin_key or not hmac.compare_digest(x_admin_key, ADMIN_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing admin credentials.")
