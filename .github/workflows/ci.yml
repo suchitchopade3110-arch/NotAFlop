@@ -29,8 +29,14 @@ jobs:
       - name: Lint (ruff)
         run: ruff check . --select=E9,F63,F7,F82
 
+      # `python -m pytest`, not the bare `pytest` console script: the
+      # `-m` form prepends the current directory to sys.path, which is
+      # what makes `from services import ...` (and every other
+      # top-level-package import in tests/conftest.py) resolve. The bare
+      # command doesn't do that and fails with "No module named
+      # 'services'" — confirmed against the actual CI failure.
       - name: Test (pytest)
-        run: pytest -q
+        run: python -m pytest -q
 
   frontend:
     name: Frontend (lint + typecheck + build)
