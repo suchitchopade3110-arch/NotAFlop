@@ -192,13 +192,22 @@ export interface IdeaDetailResponse {
   updated_at: string;
 }
 
+/** services/log_service.py's record_snapshot() — empty {} on the first
+ * ("initial") snapshot, which has no predecessor to diff against. */
+export interface SnapshotDeltas {
+  raw_score?: number;
+  dimensions?: Record<string, number>;
+  previous_weights_version?: number;
+  current_weights_version?: number;
+}
+
 export interface SnapshotSummary {
   snapshot_id: string;
   trigger: "initial" | "scheduled" | "evidence" | "manual";
   raw_score: number;
   verdict: string;
   weights_version: number;
-  deltas: Record<string, unknown>;
+  deltas: SnapshotDeltas;
   version_crossing: boolean;
   cost: number;
   created_at: string;
