@@ -56,5 +56,10 @@ GROQ_DEFAULT_COMPLETION_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_COMPL
 # path — via core.validation.validate_transcript().
 TRANSCRIPT_MAX_LENGTH: int = int(os.getenv("TRANSCRIPT_MAX_LENGTH", "5000"))
 
+# CORS (C6) — see core/cors.py for the resolution rule (env-driven,
+# localhost default only in development, fails loudly otherwise).
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").strip().lower()
+CORS_ALLOWED_ORIGINS_RAW: str = os.getenv("CORS_ALLOWED_ORIGINS", "")
+
 # Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
 # it versions, instead of here — stamped on every report at write time.

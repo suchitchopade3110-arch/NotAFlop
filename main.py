@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.cors import resolve_cors_origins
 from core.logging import configure_logging
 from core.middleware import RequestIDMiddleware
 from repositories import report_repository, session_repository
@@ -26,7 +27,7 @@ app = FastAPI(title="NotAFlop API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # update for prod
+    allow_origins=resolve_cors_origins(),  # C6: env-driven, see core/cors.py
     allow_methods=["*"],
     allow_headers=["*"],
 )
