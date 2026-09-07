@@ -95,6 +95,11 @@ MAGIC_LINK_RATE_LIMIT_MAX: int = int(os.getenv("MAGIC_LINK_RATE_LIMIT_MAX", "5")
 MAGIC_LINK_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("MAGIC_LINK_RATE_LIMIT_WINDOW_SECONDS", str(60 * 60)))
 FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 
+# Public share card (B2) — no-auth route, rate limited per ip so a card
+# going viral (or an adversarial scraper) can't drive unbounded reads.
+SHARE_CARD_RATE_LIMIT_MAX: int = int(os.getenv("SHARE_CARD_RATE_LIMIT_MAX", "60"))
+SHARE_CARD_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("SHARE_CARD_RATE_LIMIT_WINDOW_SECONDS", str(60 * 60)))
+
 # Idea/report retention for unclaimed (no account_id) ideas, in days —
 # claimed ideas persist indefinitely (see A4).
 UNCLAIMED_IDEA_TTL_DAYS: int = int(os.getenv("UNCLAIMED_IDEA_TTL_DAYS", "30"))
