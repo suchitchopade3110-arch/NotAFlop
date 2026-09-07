@@ -3,9 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.logging import configure_logging
+from core.middleware import RequestIDMiddleware
 from repositories import report_repository, session_repository
 from routers import internal, phase1, phase2, phase3, phase4, phase5, reports
 from services import mongo
+
+configure_logging()
 
 
 @asynccontextmanager
@@ -19,6 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NotAFlop API", version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # update for prod

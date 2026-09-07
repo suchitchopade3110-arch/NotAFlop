@@ -1,16 +1,16 @@
 """
 The only module allowed to talk to the `sessions` Motor collection directly.
 """
-import logging
 from datetime import datetime, timedelta, timezone
 
 from pymongo import ASCENDING
 from pymongo.errors import PyMongoError
 
+from core.logging import get_logger
 from models.documents import SessionDocument
 from services import mongo
 
-logger = logging.getLogger("notaflop.repositories.session")
+logger = get_logger("notaflop.repositories.session")
 
 COLLECTION_NAME = "sessions"
 SESSION_TTL_DAYS = 30

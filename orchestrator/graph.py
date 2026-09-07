@@ -26,9 +26,10 @@ independent "blocking but still gate on raw" combination.
 """
 import asyncio
 import json
-import logging
 import time
 from typing import AsyncGenerator, Literal
+
+import structlog
 
 try:
     from langgraph.graph import END, StateGraph
@@ -40,6 +41,7 @@ from agents import verifier as verifier_agent
 from agents.specialist_agents import ALL_AGENTS
 from core.config import VERIFIER_PENALTY_ENABLED
 from core.ids import generate_public_id
+from core.logging import get_logger
 from models.documents import AgentResultRecord, ReportDocument, VerifierOutput
 from orchestrator.state import AgentOutput, GraphState
 from repositories import report_repository, session_repository
@@ -47,7 +49,7 @@ from services.conflict_detector import detect_conflicts
 from services.gate import PIVOT_THRESHOLD, WEIGHTS_VERSION, aggregate_results, apply_verifier_penalty
 from services.signal_quality import compute_report_signal_quality
 
-logger = logging.getLogger("notaflop.orchestrator")
+logger = get_logger("notaflop.orchestrator")
 
 _AGENT_MODEL_BY_NAME = {agent.name: agent.model for agent in ALL_AGENTS}
 
@@ -130,7 +132,7 @@ async def _persist_report(
     """Returns the new report's public_id if it was saved, else None —
     shadow mode needs the id back to patch the Verifier result in later."""
     if not session_id:
-        logger.warning("No session_id supplied — report not persisted.")
+        logger.warning("report_not_persisted", status="no_session_id")
         return None
 
     agent_results = {
@@ -185,7 +187,10 @@ async def _run_verifier_shadow(public_id: str, raw_score: int, results: dict[str
     on the SSE critical path while VERIFIER_PENALTY_ENABLED is false."""
     wave2_started_at = time.monotonic()
     verifier_output = await verifier_agent.run(results)
-    logger.info("wave2_complete elapsed_s=%.2f blocking=False", time.monotonic() - wave2_started_at)
+    logger.info(
+        "wave2_complete",
+        duration_s=round(time.monotonic() - wave2_started_at, 2), blocking=False, status="ok",
+    )
 
     adjusted_score, _adjusted_verdict, verdict_would_flip = apply_verifier_penalty(raw_score, verifier_output)
     await report_repository.patch_verifier(public_id, verifier_output, adjusted_score, verdict_would_flip)
@@ -209,6 +214,15 @@ async def _run_pipeline(
 ) -> None:
     """Runs all agents, streams progress onto `queue`, aggregates, and
     persists — regardless of whether anything is still reading `queue`."""
+    # C2: this pipeline runs as its own detached asyncio.Task (see
+    # spawn_pipeline) rather than inline with the request — so it can't
+    # rely on the request's contextvars (bound by core.middleware /
+    # core.session, and cleared once the request itself finishes); it
+    # binds session_id into its OWN task-local context instead, since it
+    # already has session_id as an explicit parameter.
+    if session_id:
+        structlog.contextvars.bind_contextvars(session_id=session_id)
+
     initial_state: GraphState = {
         "transcript": transcript,
         "keyword": keyword,
@@ -274,7 +288,10 @@ async def _run_pipeline(
 
         raw_score, verdict = aggregate_results(results)
         gated_score, gated_verdict = raw_score, verdict
-        logger.info("wave1_complete elapsed_s=%.2f", time.monotonic() - wave1_started_at)
+        logger.info(
+            "wave1_complete",
+            duration_s=round(time.monotonic() - wave1_started_at, 2), status="ok",
+        )
 
         if VERIFIER_PENALTY_ENABLED:
             # Blocking wave 2 — Verifier is on the critical path, and the
@@ -283,8 +300,8 @@ async def _run_pipeline(
                 wave2_started_at = time.monotonic()
                 verifier_output = await verifier_agent.run(results)
                 logger.info(
-                    "wave2_complete elapsed_s=%.2f blocking=True",
-                    time.monotonic() - wave2_started_at,
+                    "wave2_complete",
+                    duration_s=round(time.monotonic() - wave2_started_at, 2), blocking=True, status="ok",
                 )
                 adjusted_score, gated_verdict, verdict_would_flip = apply_verifier_penalty(
                     raw_score, verifier_output
@@ -293,7 +310,7 @@ async def _run_pipeline(
                 gating_score = "adjusted"
             except Exception:
                 errors.append("verifier: blocking call failed — gated on raw_score instead.")
-                logger.error("Blocking Verifier call failed — falling back to raw_score.", exc_info=True)
+                logger.error("verifier_blocking_call_failed", status="error", fallback="raw_score", exc_info=True)
 
         public_id = generate_public_id() if session_id else None
         await queue.put(

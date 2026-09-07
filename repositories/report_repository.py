@@ -4,16 +4,16 @@ Routers and the orchestrator go through here, never through services.mongo
 or Motor collections themselves.
 """
 import hashlib
-import logging
 import re
 
 from pymongo import ASCENDING
 from pymongo.errors import PyMongoError
 
+from core.logging import get_logger
 from models.documents import ReportDocument, VerifierOutput
 from services import mongo
 
-logger = logging.getLogger("notaflop.repositories.report")
+logger = get_logger("notaflop.repositories.report")
 
 COLLECTION_NAME = "reports"
 
@@ -75,14 +75,14 @@ async def create_report(doc: ReportDocument) -> bool:
     """
     coll = _collection()
     if coll is None:
-        logger.warning("Mongo unavailable — report %s not persisted.", doc.public_id)
+        logger.warning("report_not_persisted", public_id=doc.public_id, status="unavailable")
         return False
 
     try:
         prior_count = await coll.count_documents({"idea_hash": doc.idea_hash})
         logger.info(
-            "idea_hash_hit_rate hash=%s prior_count=%d is_repeat=%s",
-            doc.idea_hash, prior_count, prior_count > 0,
+            "idea_hash_hit_rate",
+            hash=doc.idea_hash, prior_count=prior_count, is_repeat=prior_count > 0,
         )
         await coll.insert_one(doc.model_dump())
         return True

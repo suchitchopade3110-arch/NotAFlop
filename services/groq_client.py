@@ -22,14 +22,13 @@ letting a single attempt alone consume most of it. transcribe_audio() has
 its own, more generous retry budget since /transcribe isn't on the
 report-generation critical path.
 """
-import logging
-
 import httpx
 from tenacity import retry, retry_if_exception, stop_after_attempt, stop_after_delay, wait_exponential_jitter
 
 from core.config import GROQ_API_KEY, WHISPER_MODEL
+from core.logging import get_logger
 
-logger = logging.getLogger("notaflop.groq_client")
+logger = get_logger("notaflop.groq_client")
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
@@ -49,8 +48,8 @@ def _log_retry(retry_state) -> None:
     agent_name = retry_state.kwargs.get("agent_name", "unknown")
     exc = retry_state.outcome.exception() if retry_state.outcome else None
     logger.warning(
-        "groq_retry agent=%s attempt=%d exception=%s",
-        agent_name, retry_state.attempt_number, exc,
+        "groq_retry",
+        agent=agent_name, attempt=retry_state.attempt_number, exception=exc, status="retrying",
     )
 
 
@@ -126,6 +125,6 @@ async def chat(
             json=payload,
         )
         if res.status_code >= 400:
-            logger.error("groq_error agent=%s status=%d body=%s", agent_name, res.status_code, res.text)
+            logger.error("groq_error", agent=agent_name, status=res.status_code, body=res.text)
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"].strip()

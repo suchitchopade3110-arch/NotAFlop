@@ -5,6 +5,7 @@ header for the (future) frontend to store and resend.
 """
 from dataclasses import dataclass
 
+import structlog
 from fastapi import Request, Response
 
 from core.ids import generate_session_id
@@ -50,6 +51,9 @@ def extract_client_ip(request: Request) -> str:
 async def get_session_context(request: Request, response: Response) -> SessionContext:
     session_id = request.headers.get(SESSION_HEADER) or generate_session_id()
     response.headers[SESSION_HEADER] = session_id
+    # C2: every log line for the rest of this request now carries
+    # session_id — see core/logging.py's module docstring.
+    structlog.contextvars.bind_contextvars(session_id=session_id)
 
     ip = extract_client_ip(request)
     await session_repository.get_or_create_session(session_id, ip)
