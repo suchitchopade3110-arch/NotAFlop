@@ -2,7 +2,7 @@
 The only module allowed to talk to the `criteria` Motor collection
 directly.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from pymongo import ASCENDING
 from pymongo.errors import PyMongoError
@@ -91,6 +91,44 @@ async def list_lapsable(now: datetime | None = None) -> list[CriterionDocument]:
         mongo.mark_unavailable(exc)
         return []
     return [_load(raw) for raw in raw_docs]
+
+
+async def list_needing_reminder(within_days: int, now: datetime | None = None) -> list[CriterionDocument]:
+    """Pending criteria whose deadline is within `within_days` and that
+    haven't already had a reminder sent (C6)."""
+    coll = _collection()
+    if coll is None:
+        return []
+    now = now or datetime.now(timezone.utc)
+    horizon = now + timedelta(days=within_days)
+    try:
+        cursor = coll.find(
+            {
+                "status": "pending",
+                "reminder_sent_at": None,
+                "deadline": {"$gte": now, "$lte": horizon},
+            }
+        )
+        raw_docs = await cursor.to_list(length=None)
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
+        return []
+    return [_load(raw) for raw in raw_docs]
+
+
+async def mark_reminder_sent(criterion_id: str) -> bool:
+    coll = _collection()
+    if coll is None:
+        return False
+    try:
+        result = await coll.update_one(
+            {"criterion_id": criterion_id, "reminder_sent_at": None},
+            {"$set": {"reminder_sent_at": datetime.now(timezone.utc)}},
+        )
+        return result.modified_count > 0
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
+        return False
 
 
 async def resolve(

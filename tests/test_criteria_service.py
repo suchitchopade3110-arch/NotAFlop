@@ -128,3 +128,44 @@ async def test_sweep_ignores_future_deadlines(mongo_db):
     await criteria_service.create_criterion(idea.idea_id, future)
 
     assert await criteria_service.sweep_lapsed_criteria() == 0
+
+
+async def test_sweep_deadline_reminders_sends_only_to_claimed_ideas(mongo_db, monkeypatch):
+    from models.documents import AccountDocument
+    from repositories import account_repository
+
+    from services.notifications import service as notifications
+    from services.notifications.base import NotificationProvider
+
+    class _Recording(NotificationProvider):
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, *, to, subject, body, kind):
+            self.sent.append(kind)
+            return True
+
+    recording = _Recording()
+    monkeypatch.setattr(notifications, "_provider", recording)
+
+    claimed_idea = await _seed_idea(session_id="sess-claimed")
+    await account_repository.create_account(AccountDocument(account_id="acct_claimed", email="f@example.com"))
+    from repositories import idea_repository
+    coll = idea_repository._collection()
+    await coll.update_one({"idea_id": claimed_idea.idea_id}, {"$set": {"account_id": "acct_claimed"}})
+
+    unclaimed_idea = await _seed_idea(session_id="sess-anon")
+
+    soon = _future_deadline(days=1)
+    await criteria_service.create_criterion(
+        claimed_idea.idea_id,
+        CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=soon),
+    )
+    await criteria_service.create_criterion(
+        unclaimed_idea.idea_id,
+        CriterionRequest(statement="Ship a working demo", metric="demo shipped", threshold="yes/no", deadline=soon),
+    )
+
+    sent_count = await criteria_service.sweep_deadline_reminders()
+    assert sent_count == 1
+    assert recording.sent == ["criteria_deadline"]

@@ -6,9 +6,9 @@ runs on, or adds an auth requirement to, the validation path
 exactly as they are; this whole router is opt-in and additive under /v1).
 
 No password: a magic link is the only credential. /auth/claim issues a
-single-use, short-TTL token (services.auth_tokens) and "sends" it —
-today that's a structured log line; C6 replaces this call site with the
-pluggable notification service without changing this route's contract.
+single-use, short-TTL token (services.auth_tokens) and sends it through
+the pluggable notification service (services.notifications — C6),
+default provider logs it rather than actually emailing.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -27,6 +27,7 @@ from models.schemas import (
 )
 from repositories import account_repository, session_repository
 from services import auth_tokens, log_service
+from services.notifications import service as notifications
 
 router = APIRouter()
 logger = get_logger("notaflop.routers.auth")
@@ -54,11 +55,11 @@ async def claim(
 
     token = await auth_tokens.issue_token(body.email, session.session_id)
 
-    # Placeholder "send" — see module docstring. Never log the token at a
-    # level that gets shipped anywhere founder-facing; this is dev-only
-    # visibility until C6 lands a real provider.
     link = f"{FRONTEND_BASE_URL}/claim?token={token}"
-    logger.info("magic_link_issued", status="logged_not_sent", link=link)
+    await notifications.send_magic_link(body.email, link)
+    # Router-level trace only (never founder-facing) — the notification
+    # service itself is what "sends" the link, default provider or real.
+    logger.info("magic_link_issued", status="dispatched", link=link)
 
     return ClaimResponse(status="sent")
 

@@ -34,6 +34,7 @@ from orchestrator.state import AgentOutput
 from repositories import idea_repository
 from services import cost_tracking, log_service
 from services.conflict_detector import detect_conflicts
+from services.notifications import service as notifications
 from services.signal_quality import compute_report_signal_quality
 from services.smart_data_layer import gather_signals
 
@@ -49,6 +50,19 @@ NEVER_RERUN_DIMENSIONS = ["risk", "yc_signal", "lovers_test"]
 # short enough that a crashed run self-heals instead of wedging the idea
 # for good.
 _SCHEDULER_LOCK_TTL_SECONDS = 15 * 60
+
+
+async def _notify(idea: IdeaDocument, snapshot: SnapshotDocument | None) -> None:
+    """Best-effort snapshot digest (C6) — suppression (no-delta, no
+    claimed account) lives inside notifications.notify_snapshot itself.
+    A notification failure must never take down a re-run that already
+    succeeded and was already persisted."""
+    if snapshot is None:
+        return
+    try:
+        await notifications.notify_snapshot(idea, snapshot)
+    except Exception:
+        logger.error("snapshot_notify_failed", idea_id=idea.idea_id, snapshot_id=snapshot.snapshot_id, status="error", exc_info=True)
 
 
 async def _run_dimensions(dims: list[str], transcript: str, signals: dict) -> dict[str, int]:
@@ -85,7 +99,7 @@ async def _run_market_sensitive(idea: IdeaDocument, trigger: str) -> SnapshotDoc
     updated_scores = await _run_dimensions(ALWAYS_RERUN_DIMENSIONS, idea.raw_text, signals)
     cost = cost_tracking.get_total_cost_usd()
 
-    return await log_service.record_snapshot(
+    snapshot = await log_service.record_snapshot(
         idea,
         trigger=trigger,
         updated_scores=updated_scores,
@@ -95,6 +109,8 @@ async def _run_market_sensitive(idea: IdeaDocument, trigger: str) -> SnapshotDoc
         conflicts=conflicts,
         cost=cost,
     )
+    await _notify(idea, snapshot)
+    return snapshot
 
 
 async def _run_locked(idea: IdeaDocument, trigger: str) -> SnapshotDocument | None:
@@ -184,6 +200,8 @@ async def run_evidence_snapshot(idea: IdeaDocument, evidence_context: str) -> Sn
     )
     cost = cost_tracking.get_total_cost_usd()
 
-    return await log_service.record_snapshot(
+    snapshot = await log_service.record_snapshot(
         idea, trigger="evidence", updated_scores=updated_scores, cost=cost,
     )
+    await _notify(idea, snapshot)
+    return snapshot

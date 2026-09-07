@@ -10,12 +10,14 @@ re-score C4's evidence submission does, through
 services.snapshot_worker.run_evidence_snapshot — which itself only ever
 writes through services.log_service.record_snapshot (constraint #6).
 """
+from core.config import CRITERIA_DEADLINE_REMINDER_DAYS
 from core.ids import generate_criterion_id, generate_evidence_id
 from core.logging import get_logger
 from models.documents import CriterionDocument, EvidenceDocument, IdeaDocument
 from models.schemas import CriterionRequest
-from repositories import criteria_repository, evidence_repository
+from repositories import criteria_repository, evidence_repository, idea_repository
 from services import snapshot_worker
+from services.notifications import service as notifications
 
 logger = get_logger("notaflop.criteria_service")
 
@@ -90,3 +92,21 @@ async def sweep_lapsed_criteria() -> int:
     if lapsed_count:
         logger.info("criteria_lapse_sweep_complete", lapsed_count=lapsed_count, status="ok")
     return lapsed_count
+
+
+async def sweep_deadline_reminders() -> int:
+    """C6's other scheduled sweep: every pending criterion whose deadline
+    is within CRITERIA_DEADLINE_REMINDER_DAYS gets exactly one reminder
+    (mark_reminder_sent is a conditional update, so a reminder is never
+    sent twice even if this sweep overlaps itself)."""
+    sent_count = 0
+    for criterion in await criteria_repository.list_needing_reminder(CRITERIA_DEADLINE_REMINDER_DAYS):
+        idea = await idea_repository.get_by_id(criterion.idea_id)
+        if idea is None:
+            continue
+        sent = await notifications.send_criteria_deadline_reminder(idea, criterion)
+        if sent and await criteria_repository.mark_reminder_sent(criterion.criterion_id):
+            sent_count += 1
+    if sent_count:
+        logger.info("criteria_reminder_sweep_complete", sent_count=sent_count, status="ok")
+    return sent_count

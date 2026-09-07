@@ -19,6 +19,7 @@ router = APIRouter()
 # off by default) picks this up alongside the snapshot sweep it already
 # runs every tick.
 scheduler.register_sweep(criteria_service.sweep_lapsed_criteria)
+scheduler.register_sweep(criteria_service.sweep_deadline_reminders)
 
 
 def _to_response(criterion: CriterionDocument) -> CriterionResponse:

@@ -100,6 +100,10 @@ FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 SHARE_CARD_RATE_LIMIT_MAX: int = int(os.getenv("SHARE_CARD_RATE_LIMIT_MAX", "60"))
 SHARE_CARD_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("SHARE_CARD_RATE_LIMIT_WINDOW_SECONDS", str(60 * 60)))
 
+# Kill-criteria deadline reminders (C6) — a criterion whose deadline is
+# within this many days, and hasn't already had a reminder sent, gets one.
+CRITERIA_DEADLINE_REMINDER_DAYS: int = int(os.getenv("CRITERIA_DEADLINE_REMINDER_DAYS", "3"))
+
 # Idea/report retention for unclaimed (no account_id) ideas, in days —
 # claimed ideas persist indefinitely (see A4).
 UNCLAIMED_IDEA_TTL_DAYS: int = int(os.getenv("UNCLAIMED_IDEA_TTL_DAYS", "30"))

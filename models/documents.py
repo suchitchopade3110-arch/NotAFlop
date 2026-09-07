@@ -223,6 +223,9 @@ class CriterionDocument(BaseModel):
     status: Literal["pending", "met", "failed", "lapsed"] = "pending"
     resolved_at: datetime | None = None
     resolution_note: str | None = None
+    # C6: set once a deadline-approaching reminder has been sent, so the
+    # sweep never re-notifies the same criterion every tick.
+    reminder_sent_at: datetime | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
 

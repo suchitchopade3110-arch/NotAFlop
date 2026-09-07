@@ -66,6 +66,32 @@ async def test_mark_lapsed_only_from_pending(mongo_db):
     assert await repo.mark_lapsed(doc.criterion_id) is False
 
 
+async def test_list_needing_reminder_within_window(mongo_db):
+    soon = _make_criterion(criterion_id="crit_0000000001", deadline=datetime.now(timezone.utc) + timedelta(days=1))
+    far = _make_criterion(criterion_id="crit_0000000002", deadline=datetime.now(timezone.utc) + timedelta(days=30))
+    await repo.create_criterion(soon)
+    await repo.create_criterion(far)
+
+    due = await repo.list_needing_reminder(within_days=3)
+    assert {c.criterion_id for c in due} == {"crit_0000000001"}
+
+
+async def test_list_needing_reminder_excludes_already_sent(mongo_db):
+    soon = _make_criterion(deadline=datetime.now(timezone.utc) + timedelta(days=1))
+    await repo.create_criterion(soon)
+    await repo.mark_reminder_sent(soon.criterion_id)
+
+    assert await repo.list_needing_reminder(within_days=3) == []
+
+
+async def test_mark_reminder_sent_only_once(mongo_db):
+    doc = _make_criterion(deadline=datetime.now(timezone.utc) + timedelta(days=1))
+    await repo.create_criterion(doc)
+
+    assert await repo.mark_reminder_sent(doc.criterion_id) is True
+    assert await repo.mark_reminder_sent(doc.criterion_id) is False
+
+
 async def test_operations_noop_when_mongo_unavailable(mongo_unavailable):
     doc = _make_criterion()
     assert await repo.create_criterion(doc) is False
@@ -74,3 +100,5 @@ async def test_operations_noop_when_mongo_unavailable(mongo_unavailable):
     assert await repo.list_lapsable() == []
     assert await repo.resolve(doc.criterion_id, "met", None) is False
     assert await repo.mark_lapsed(doc.criterion_id) is False
+    assert await repo.list_needing_reminder(within_days=3) == []
+    assert await repo.mark_reminder_sent(doc.criterion_id) is False
