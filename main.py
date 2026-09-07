@@ -7,7 +7,7 @@ from core.logging import configure_logging
 from core.middleware import RequestIDMiddleware
 from repositories import report_repository, session_repository
 from routers import internal, phase1, phase2, phase3, phase4, phase5, reports
-from services import mongo
+from services import health, mongo
 
 configure_logging()
 
@@ -41,5 +41,8 @@ app.include_router(internal.router, prefix="/internal", tags=["Internal"])
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health_check():
+    """Deep health check (Phase 1, C4) — see services/health.py. Fast
+    (short per-dependency timeouts, cached briefly), never blocking, and
+    one dependency's failure never cascades into another's check."""
+    return await health.get_health()
