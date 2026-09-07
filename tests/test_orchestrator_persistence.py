@@ -84,6 +84,37 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
     assert doc.low_confidence is True
     assert doc.signal_quality > 0
     assert doc.signal_quality_by_source["reddit"] > 0
+    # B4: single-source signals here -> nothing to cross-check for conflicts.
+    assert doc.conflicts == []
+    assert items[0]["payload"]["conflicts"] == []
+
+
+async def test_conflicting_signals_are_streamed_and_persisted(mongo_db, monkeypatch):
+    """B4: a real cross-source conflict in the signals passed to /analyze
+    shows up in the signal_quality SSE event and on the persisted doc."""
+    _patch_agents(monkeypatch, score=8)
+
+    conflicting_signals = {
+        "google_trends": {"trend": "declining", "raw": [80, 60, 40]},
+        "reddit": {"pain_frequency": "high", "post_count": 50},
+    }
+
+    queue: asyncio.Queue = asyncio.Queue()
+    task = graph.spawn_pipeline(
+        queue, "Uber for dogs", "dog walking", conflicting_signals,
+        session_id="sess-conflict", ip="1.2.3.4",
+    )
+    items = await _drain(queue)
+    await task
+    await _drain_background_tasks()
+
+    assert items[0]["type"] == "signal_quality"
+    assert len(items[0]["payload"]["conflicts"]) == 1
+    assert items[0]["payload"]["conflicts"][0]["dimension"] == "interest_vs_pain"
+
+    doc = (await report_repository.list_by_session("sess-conflict"))[0]
+    assert len(doc.conflicts) == 1
+    assert doc.conflicts[0]["dimension"] == "interest_vs_pain"
 
 
 async def test_no_persist_without_session_id(mongo_db, monkeypatch):

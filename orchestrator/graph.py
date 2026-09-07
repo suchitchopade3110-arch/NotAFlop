@@ -43,6 +43,7 @@ from core.ids import generate_public_id
 from models.documents import AgentResultRecord, ReportDocument, VerifierOutput
 from orchestrator.state import AgentOutput, GraphState
 from repositories import report_repository, session_repository
+from services.conflict_detector import detect_conflicts
 from services.gate import PIVOT_THRESHOLD, WEIGHTS_VERSION, aggregate_results, apply_verifier_penalty
 from services.signal_quality import compute_report_signal_quality
 
@@ -124,6 +125,7 @@ async def _persist_report(
     signal_quality: float = 0.0,
     signal_quality_by_source: dict[str, float] | None = None,
     low_confidence: bool = False,
+    conflicts_detected: list[dict] | None = None,
 ) -> str | None:
     """Returns the new report's public_id if it was saved, else None —
     shadow mode needs the id back to patch the Verifier result in later."""
@@ -159,6 +161,7 @@ async def _persist_report(
         signal_quality=signal_quality,
         signal_quality_by_source=signal_quality_by_source or {},
         low_confidence=low_confidence,
+        conflicts=conflicts_detected or [],
         weights_version=WEIGHTS_VERSION,
         raw_score=raw_score,
         adjusted_score=adjusted_score,
@@ -216,16 +219,19 @@ async def _run_pipeline(
         "errors": [],
     }
 
-    # B3: computed up front from the signals already gathered for this
-    # request — independent of the agents, so it's ready to stream before
-    # any agent finishes and doesn't wait on them.
+    # B3/B4: computed up front from the signals already gathered for this
+    # request — independent of the agents (no LLM call, rule-based), so
+    # it's ready to stream before any agent finishes and doesn't wait on
+    # them. Both are disclosure layers only; neither touches scoring.
     signal_quality, low_confidence, signal_quality_by_source = compute_report_signal_quality(signals)
+    conflicts_detected = detect_conflicts(signals)
     await queue.put({
         "type": "signal_quality",
         "payload": {
             "signal_quality": signal_quality,
             "low_confidence": low_confidence,
             "signal_quality_by_source": signal_quality_by_source,
+            "conflicts": conflicts_detected,
         },
     })
 
@@ -310,7 +316,7 @@ async def _run_pipeline(
             verifier=verifier_output, adjusted_score=adjusted_score,
             gating_score=gating_score, verdict_would_flip=verdict_would_flip,
             signal_quality=signal_quality, signal_quality_by_source=signal_quality_by_source,
-            low_confidence=low_confidence,
+            low_confidence=low_confidence, conflicts_detected=conflicts_detected,
         )
         if saved_public_id and not VERIFIER_PENALTY_ENABLED:
             # Shadow mode: Verifier hasn't run yet — kick it off now,

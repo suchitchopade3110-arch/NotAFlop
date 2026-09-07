@@ -59,6 +59,11 @@ class ReportDocument(BaseModel):
     signal_quality_by_source: dict[str, float] = Field(default_factory=dict)
     low_confidence: bool = False
 
+    # B4: rule-based cross-source conflicts detected on `signals`. Each
+    # entry: {dimension, sources, directions, description}. Also a
+    # disclosure layer — never feeds back into scoring.
+    conflicts: list[dict] = Field(default_factory=list)
+
     agent_results: dict[str, AgentResultRecord] = Field(default_factory=dict)
     verifier: VerifierOutput | None = None
 

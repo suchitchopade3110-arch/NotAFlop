@@ -66,6 +66,7 @@ class ReportResponse(BaseModel):
     signal_quality: float = 0.0
     signal_quality_by_source: dict[str, float] = Field(default_factory=dict)
     low_confidence: bool = False
+    conflicts: list[dict] = Field(default_factory=list)
 
     weights_version: int
     raw_score: int
