@@ -3,12 +3,14 @@ Cross-cutting FastAPI dependencies applied at the route level (not
 middleware) — so they only run on the endpoints that opt in.
 """
 import hmac
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from fastapi import Depends, Header, HTTPException
 
 from core.config import ADMIN_API_KEY
 from core.session import SESSION_HEADER, SessionContext, get_session_context
+from repositories import session_repository
 from services.rate_limiter import check_rate_limit
 
 ADMIN_KEY_HEADER = "X-Admin-Key"
@@ -40,6 +42,24 @@ async def enforce_rate_limit(session: SessionContext = Depends(get_session_conte
         )
 
     return session
+
+
+@dataclass(frozen=True)
+class OwnerContext:
+    """Session identity plus whatever account it's currently bound to
+    (Phase 2, A4) — the shape every /v1/ideas/* and related route needs
+    for ownership checks (repositories.idea_repository.owns). Anonymous
+    (unclaimed) callers get account_id=None, exactly like today."""
+
+    session_id: str
+    account_id: str | None
+    ip: str
+
+
+async def get_owner_context(session: SessionContext = Depends(get_session_context)) -> OwnerContext:
+    session_doc = await session_repository.get_session(session.session_id)
+    account_id = session_doc.account_id if session_doc else None
+    return OwnerContext(session_id=session.session_id, account_id=account_id, ip=session.ip)
 
 
 async def require_admin(x_admin_key: str | None = Header(default=None, alias=ADMIN_KEY_HEADER)) -> None:

@@ -79,6 +79,30 @@ async def increment_report_count(session_id: str) -> None:
         mongo.mark_unavailable(exc)
 
 
+_CLAIMED_TTL_YEARS = 10
+
+
+async def set_account_id(session_id: str, account_id: str) -> bool:
+    """A4's claim redemption: binds this session permanently to an
+    account and pushes expires_at far out so the TTL index effectively
+    never fires for it — "claimed logs persist indefinitely" (an
+    unclaimed session still expires on the normal 30-day sliding window
+    via get_or_create_session)."""
+    coll = _collection()
+    if coll is None:
+        return False
+    far_future = datetime.now(timezone.utc) + timedelta(days=365 * _CLAIMED_TTL_YEARS)
+    try:
+        result = await coll.update_one(
+            {"session_id": session_id},
+            {"$set": {"account_id": account_id, "expires_at": far_future}},
+        )
+        return result.matched_count > 0
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
+        return False
+
+
 async def get_session(session_id: str) -> SessionDocument | None:
     coll = _collection()
     if coll is None:
