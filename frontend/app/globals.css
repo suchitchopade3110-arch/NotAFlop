@@ -1,0 +1,238 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   NotAFlop — Obsidian Gold design tokens
+
+   Token plan (the full system every color/spacing/type decision below is
+   derived from):
+
+   Palette (named hex, one accent family — gold):
+     obsidian        #0A0A0B   page background, near-black warm black
+     charcoal        #15151A   card / surface background
+     charcoal-raised #1D1D22   raised surface (modals, hovered rows)
+     gold            #C9A84C   primary accent — links, primary actions, focus
+     gold-bright     #E8C97A   accent hover/active, gradient top stop
+     gold-deep       #8A6C2E   accent pressed, gradient bottom stop
+
+   Ink (text) is a warm off-white family, never pure #fff/#000 — reads
+   softer against the obsidian base and keeps contrast intentional:
+     ink        #F3F1EA   primary text
+     ink-muted  #A9A6A0   secondary text / labels
+     ink-faint  #6E6C66   tertiary / disabled / metadata
+
+   Verdict semantics are a SEPARATE family from the gold accent on purpose
+   — a Go/Pivot/No-Go treatment must never be mistaken for brand chrome:
+     go     #3FAE72   jade green
+     pivot  #E08A3C   amber-orange
+     nogo   #C9524A   garnet (deliberately not alarm-red — rejection is a
+                       task to work through, not an error state)
+
+   Type scale (explicit weight + tracking per step, defined as classes
+   below rather than bare utilities so every headline in the app pulls
+   from the same seven steps):
+     display-xl  56/60   Space Grotesk 600  -0.02em   hero headline only
+     display-l   40/46   Space Grotesk 600  -0.015em  section heads
+     heading     24/32   Space Grotesk 600  -0.005em  card/module titles
+     heading-sm  18/26   Space Grotesk 600   0em      subheads
+     body-l      18/29   Inter         400   0em      lede paragraphs
+     body        15/24   Inter         400   0em      default copy
+     label       12/16   Inter         600   0.08em   eyebrow — max 1 per 3
+                                                       sections (uppercase)
+     mono        14/20   JetBrains Mono 500  0em      scores, sources,
+                                                       tokens, timestamps
+
+   Spacing: Tailwind's default 4px scale (1=4px..96=384px) covers this
+   system; no custom spacing tokens needed.
+
+   Elevation: three shadow tokens below (nf-sm/nf-md/nf-gold) — the last
+   is a soft gold glow reserved for the primary CTA and the dimension
+   card currently streaming in, never used decoratively elsewhere.
+
+   Layout concepts (one sentence each):
+     Landing        — a single dark canvas where the pitch textarea is the
+                       only bordered, lit object on the page; everything
+                       else (headline, proof line, mechanism note) sits
+                       quiet in a two-column zigzag beneath it.
+     Streaming view — a vertical list of dimension cards that light up
+                       one at a time as results land, with the aggregate
+                       score fixed in a side panel that stays empty/
+                       pending until the last dimension resolves.
+     Verdict        — a full-bleed treatment keyed to the verdict color;
+                       No-Go renders as a checklist of what would need to
+                       be true, never a scoreboard.
+     Share card      — one vertical mobile-first card: score dial, verdict,
+                       a benchmark line against a named historical failure,
+                       nothing else.
+   ========================================================================== */
+
+@theme {
+  --color-obsidian: #0a0a0b;
+  --color-charcoal: #15151a;
+  --color-charcoal-raised: #1d1d22;
+  --color-border: #2b2b30;
+  --color-border-soft: #232328;
+
+  --color-gold: #c9a84c;
+  --color-gold-bright: #e8c97a;
+  --color-gold-deep: #8a6c2e;
+
+  --color-ink: #f3f1ea;
+  --color-ink-muted: #a9a6a0;
+  --color-ink-faint: #6e6c66;
+
+  --color-go: #3fae72;
+  --color-go-wash: #3fae721f;
+  --color-pivot: #e08a3c;
+  --color-pivot-wash: #e08a3c1f;
+  --color-nogo: #c9524a;
+  --color-nogo-wash: #c9524a1f;
+
+  --font-display: var(--font-space-grotesk), "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --shadow-nf-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-nf-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-nf-gold: 0 0 0 1px rgba(201, 168, 76, 0.28), 0 8px 28px rgba(201, 168, 76, 0.12);
+
+  --animate-pulse-soft: pulse-soft 2.2s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-obsidian);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+/* Visible focus state on every interactive element — never suppressed. */
+:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--color-gold-deep);
+  color: var(--color-ink);
+}
+
+/* ── Type scale — see token plan above ───────────────────────────── */
+.text-display-xl {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+@media (min-width: 640px) {
+  .text-display-xl {
+    font-size: 3.5rem;
+    line-height: 1.05;
+  }
+}
+
+.text-display-l {
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+@media (min-width: 640px) {
+  .text-display-l {
+    font-size: 2.5rem;
+    line-height: 1.1;
+  }
+}
+
+.text-heading {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+@media (min-width: 640px) {
+  .text-heading {
+    font-size: 1.5rem;
+  }
+}
+
+.text-heading-sm {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+@media (min-width: 640px) {
+  .text-heading-sm {
+    font-size: 1.125rem;
+  }
+}
+
+.text-body-l {
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  font-weight: 400;
+}
+@media (min-width: 640px) {
+  .text-body-l {
+    font-size: 1.125rem;
+  }
+}
+
+.text-body {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.text-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.text-mono {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* Respect prefers-reduced-motion globally (D3) — animations/transitions
+   collapse to instant rather than being individually special-cased. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
