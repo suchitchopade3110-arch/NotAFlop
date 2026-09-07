@@ -177,6 +177,16 @@ async def record_snapshot(
 
     version_crossing = previous.weights_version != WEIGHTS_VERSION
 
+    # C2: per-dimension scores (0-10) mean the same thing regardless of
+    # WEIGHTS_VERSION — only the WEIGHTS themselves changed, not the
+    # rubric each agent scores against — so "dimensions" stays a
+    # meaningful like-for-like diff even across a weights change. The
+    # aggregate raw_score delta is the one that can be misleading (the
+    # same dimension scores can produce a different aggregate purely
+    # from a weights change, with nothing in the market or evidence
+    # having moved) — version_crossing flags exactly that, and
+    # weights_version is stored on BOTH sides of the comparison so a
+    # reader never has to guess which weighting produced which number.
     deltas = {
         "raw_score": raw_score - previous.raw_score,
         "dimensions": {
@@ -184,6 +194,8 @@ async def record_snapshot(
             for dim in updated_scores
             if dim in previous.agent_scores
         },
+        "previous_weights_version": previous.weights_version,
+        "current_weights_version": WEIGHTS_VERSION,
     }
 
     snapshot = SnapshotDocument(

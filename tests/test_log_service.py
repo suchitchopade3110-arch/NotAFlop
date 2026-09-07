@@ -89,6 +89,41 @@ async def test_record_snapshot_carries_forward_untouched_dimensions(mongo_db):
     assert snapshot.cost == 0.05
 
 
+async def test_record_snapshot_deltas_store_weights_version_on_both_sides(mongo_db):
+    report = _make_report()  # weights_version=2
+    idea = await log_service.promote_report_to_idea(
+        report, session_id="sess1", account_id=None, share_token="tok_bothsides"
+    )
+
+    snapshot = await log_service.record_snapshot(idea, trigger="scheduled", updated_scores={"timing": 9})
+    assert snapshot.deltas["previous_weights_version"] == 2
+    assert snapshot.deltas["current_weights_version"] == 2
+    assert snapshot.version_crossing is False
+
+
+async def test_record_snapshot_dimension_deltas_survive_version_crossing(mongo_db, monkeypatch):
+    """C2: per-dimension deltas stay a like-for-like diff even across a
+    weights change (the rubric each dimension is scored against doesn't
+    change) — only the AGGREGATE delta is what version_crossing warns a
+    reader not to read as market movement."""
+    import services.log_service as ls
+
+    report = _make_report()  # weights_version=2
+    idea = await log_service.promote_report_to_idea(
+        report, session_id="sess1", account_id=None, share_token="tok_crossdim"
+    )
+
+    monkeypatch.setattr(ls, "WEIGHTS_VERSION", 3)
+    snapshot = await log_service.record_snapshot(idea, trigger="scheduled", updated_scores={"timing": 9})
+
+    assert snapshot.version_crossing is True
+    assert snapshot.deltas["previous_weights_version"] == 2
+    assert snapshot.deltas["current_weights_version"] == 3
+    # The per-dimension delta is still the honest arithmetic diff — not
+    # suppressed or zeroed out just because the versions differ.
+    assert snapshot.deltas["dimensions"]["timing"] == 3
+
+
 async def test_record_snapshot_version_crossing_flagged(mongo_db, monkeypatch):
     import services.log_service as ls
 
