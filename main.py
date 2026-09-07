@@ -6,7 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.cors import resolve_cors_origins
 from core.logging import configure_logging
 from core.middleware import RequestIDMiddleware
-from repositories import report_repository, session_repository
+from repositories import (
+    account_repository,
+    criteria_repository,
+    evidence_repository,
+    idea_repository,
+    report_repository,
+    session_repository,
+    snapshot_repository,
+)
 from routers import internal, phase1, phase2, phase3, phase4, phase5, reports
 from services import health, mongo
 
@@ -18,6 +26,12 @@ async def lifespan(app: FastAPI):
     await mongo.connect()
     await report_repository.ensure_indexes()
     await session_repository.ensure_indexes()
+    # Phase 2 (additive) — evidence-log collections.
+    await account_repository.ensure_indexes()
+    await idea_repository.ensure_indexes()
+    await snapshot_repository.ensure_indexes()
+    await criteria_repository.ensure_indexes()
+    await evidence_repository.ensure_indexes()
     yield
     await mongo.disconnect()
 
