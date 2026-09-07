@@ -183,6 +183,12 @@ class SnapshotDocument(BaseModel):
     verdict: str
     weights_version: int
     sources: list[str] = Field(default_factory=list)
+    # The actual market-signals payload as of this snapshot (beyond the
+    # table's minimum fields, additive) — an evidence-gated re-run (C4)
+    # never refreshes the data layer, so it needs the previous snapshot's
+    # signals to feed the agents it does re-run; storing them here keeps
+    # that "carried forward, not re-derived on read" for signals too.
+    signals: dict = Field(default_factory=dict)
     signal_quality: float = 0.0
     conflicts: list[dict] = Field(default_factory=list)
     trigger: Literal["initial", "scheduled", "evidence", "manual"] = "initial"

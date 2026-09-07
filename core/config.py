@@ -82,6 +82,13 @@ SNAPSHOT_SCHEDULE_INTERVAL_DAYS: int = int(os.getenv("SNAPSHOT_SCHEDULE_INTERVAL
 SNAPSHOT_SCHEDULER_ENABLED: bool = os.getenv("SNAPSHOT_SCHEDULER_ENABLED", "false").lower() == "true"
 SNAPSHOT_SCHEDULER_INTERVAL_SECONDS: int = int(os.getenv("SNAPSHOT_SCHEDULER_INTERVAL_SECONDS", str(6 * 60 * 60)))
 
+# Manual force-re-run cap (B1's POST /v1/ideas/{id}/snapshots) — rate
+# limited independently of the validation caps above (RATE_LIMIT_*).
+SNAPSHOT_MANUAL_RERUN_MAX: int = int(os.getenv("SNAPSHOT_MANUAL_RERUN_MAX", "3"))
+SNAPSHOT_MANUAL_RERUN_WINDOW_SECONDS: int = int(
+    os.getenv("SNAPSHOT_MANUAL_RERUN_WINDOW_SECONDS", str(24 * 60 * 60))
+)
+
 # Progressive identity (A4).
 SESSION_CLAIM_TOKEN_TTL_SECONDS: int = int(os.getenv("SESSION_CLAIM_TOKEN_TTL_SECONDS", "900"))  # 15 min
 MAGIC_LINK_RATE_LIMIT_MAX: int = int(os.getenv("MAGIC_LINK_RATE_LIMIT_MAX", "5"))

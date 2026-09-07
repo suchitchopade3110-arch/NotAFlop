@@ -219,6 +219,10 @@ class MeResponse(BaseModel):
 
 
 # ── Phase 2: the log surface (B1/B2) ─────────────────────────────────
+class PromoteIdeaRequest(BaseModel):
+    report_id: str = Field(..., description="Public ID of an already-persisted v1 report")
+
+
 class IdeaSummary(BaseModel):
     """One row of GET /v1/ideas."""
 

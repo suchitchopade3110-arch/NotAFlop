@@ -19,7 +19,13 @@ from dataclasses import dataclass
 
 from redis.exceptions import RedisError
 
-from core.config import RATE_LIMIT_IP_MAX, RATE_LIMIT_SESSION_MAX, RATE_LIMIT_WINDOW_SECONDS
+from core.config import (
+    RATE_LIMIT_IP_MAX,
+    RATE_LIMIT_SESSION_MAX,
+    RATE_LIMIT_WINDOW_SECONDS,
+    SNAPSHOT_MANUAL_RERUN_MAX,
+    SNAPSHOT_MANUAL_RERUN_WINDOW_SECONDS,
+)
 from core.logging import get_logger
 from services.cache import get_client
 
@@ -106,3 +112,17 @@ async def check_rate_limit(session_id: str, ip: str) -> RateLimitResult:
         return ip_result
 
     return session_result
+
+
+async def check_snapshot_rerun_rate_limit(idea_id: str) -> RateLimitResult:
+    """Independent of check_rate_limit's validation caps (constraint:
+    'rate limited independently of validation') — a founder forcing a
+    re-run on one idea's log doesn't touch their validation quota, and
+    vice versa. Scoped per idea, not per session, so it caps cost on the
+    idea itself regardless of who's driving it."""
+    return await _check_one(
+        "idea_snapshot",
+        f"ratelimit:snapshot:{idea_id}",
+        SNAPSHOT_MANUAL_RERUN_MAX,
+        SNAPSHOT_MANUAL_RERUN_WINDOW_SECONDS,
+    )

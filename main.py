@@ -15,7 +15,7 @@ from repositories import (
     session_repository,
     snapshot_repository,
 )
-from routers import internal, phase1, phase2, phase3, phase4, phase5, reports, v1_auth
+from routers import internal, phase1, phase2, phase3, phase4, phase5, reports, v1_auth, v1_ideas
 from services import health, mongo
 
 configure_logging()
@@ -57,6 +57,7 @@ app.include_router(internal.router, prefix="/internal", tags=["Internal"])
 # Phase 2 — everything new is namespaced under /v1, existing routes above
 # are untouched (constraint #2).
 app.include_router(v1_auth.router, prefix="/v1", tags=["Phase 2 - Identity"])
+app.include_router(v1_ideas.router, prefix="/v1", tags=["Phase 2 - Ideas"])
 
 
 @app.get("/health")
