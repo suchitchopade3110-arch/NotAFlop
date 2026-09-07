@@ -3,9 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.cors import resolve_cors_origins
+from core.logging import configure_logging
+from core.middleware import RequestIDMiddleware
 from repositories import report_repository, session_repository
-from routers import phase1, phase2, phase3, phase4, phase5, reports
-from services import mongo
+from routers import internal, phase1, phase2, phase3, phase4, phase5, reports
+from services import health, mongo
+
+configure_logging()
 
 
 @asynccontextmanager
@@ -19,9 +24,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NotAFlop API", version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # update for prod
+    allow_origins=resolve_cors_origins(),  # C6: env-driven, see core/cors.py
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,8 +38,12 @@ app.include_router(phase3.router, prefix="/api/phase3", tags=["Phase 3 - Analyze
 app.include_router(phase4.router, prefix="/api/phase4", tags=["Phase 4 - Gate"])
 app.include_router(phase5.router, prefix="/api/phase5", tags=["Phase 5 - Plan & Build"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
+app.include_router(internal.router, prefix="/internal", tags=["Internal"])
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health_check():
+    """Deep health check (Phase 1, C4) — see services/health.py. Fast
+    (short per-dependency timeouts, cached briefly), never blocking, and
+    one dependency's failure never cascades into another's check."""
+    return await health.get_health()

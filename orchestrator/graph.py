@@ -26,9 +26,10 @@ independent "blocking but still gate on raw" combination.
 """
 import asyncio
 import json
-import logging
 import time
 from typing import AsyncGenerator, Literal
+
+import structlog
 
 try:
     from langgraph.graph import END, StateGraph
@@ -40,12 +41,16 @@ from agents import verifier as verifier_agent
 from agents.specialist_agents import ALL_AGENTS
 from core.config import VERIFIER_PENALTY_ENABLED
 from core.ids import generate_public_id
+from core.logging import get_logger
 from models.documents import AgentResultRecord, ReportDocument, VerifierOutput
 from orchestrator.state import AgentOutput, GraphState
 from repositories import report_repository, session_repository
+from services.conflict_detector import detect_conflicts
+from services import cost_tracking
 from services.gate import PIVOT_THRESHOLD, WEIGHTS_VERSION, aggregate_results, apply_verifier_penalty
+from services.signal_quality import compute_report_signal_quality
 
-logger = logging.getLogger("notaflop.orchestrator")
+logger = get_logger("notaflop.orchestrator")
 
 _AGENT_MODEL_BY_NAME = {agent.name: agent.model for agent in ALL_AGENTS}
 
@@ -120,11 +125,16 @@ async def _persist_report(
     adjusted_score: int | None = None,
     gating_score: Literal["raw", "adjusted"] = "raw",
     verdict_would_flip: bool = False,
+    signal_quality: float = 0.0,
+    signal_quality_by_source: dict[str, float] | None = None,
+    low_confidence: bool = False,
+    conflicts_detected: list[dict] | None = None,
+    report_cost_usd: float = 0.0,
 ) -> str | None:
     """Returns the new report's public_id if it was saved, else None —
     shadow mode needs the id back to patch the Verifier result in later."""
     if not session_id:
-        logger.warning("No session_id supplied — report not persisted.")
+        logger.warning("report_not_persisted", status="no_session_id")
         return None
 
     agent_results = {
@@ -152,6 +162,11 @@ async def _persist_report(
         filter_result=filter_result,
         agent_results=agent_results,
         verifier=verifier,
+        signal_quality=signal_quality,
+        signal_quality_by_source=signal_quality_by_source or {},
+        low_confidence=low_confidence,
+        conflicts=conflicts_detected or [],
+        report_cost_usd=report_cost_usd,
         weights_version=WEIGHTS_VERSION,
         raw_score=raw_score,
         adjusted_score=adjusted_score,
@@ -169,20 +184,38 @@ async def _persist_report(
     return public_id
 
 
-async def _run_verifier_shadow(public_id: str, raw_score: int, results: dict[str, AgentOutput]) -> None:
+async def _run_verifier_shadow(
+    public_id: str, raw_score: int, results: dict[str, AgentOutput], cost_marker: int,
+) -> None:
     """Fire-and-forget: runs the Verifier after the report already
     streamed and was persisted on raw_score, then patches the doc. Never
-    on the SSE critical path while VERIFIER_PENALTY_ENABLED is false."""
+    on the SSE critical path while VERIFIER_PENALTY_ENABLED is false.
+
+    cost_marker (C3): this task is spawned from _run_pipeline's context
+    AFTER its report_cost_usd was already read and persisted, so this
+    call's own Groq cost isn't in that total yet — cost_marker is the
+    shared ledger's length at spawn time, letting cost_since() isolate
+    just this call's cost to $inc onto the doc rather than re-summing
+    (and double-counting) the whole ledger."""
     wave2_started_at = time.monotonic()
     verifier_output = await verifier_agent.run(results)
-    logger.info("wave2_complete elapsed_s=%.2f blocking=False", time.monotonic() - wave2_started_at)
+    logger.info(
+        "wave2_complete",
+        duration_s=round(time.monotonic() - wave2_started_at, 2), blocking=False, status="ok",
+    )
+    verifier_cost_usd = cost_tracking.cost_since(cost_marker)
 
     adjusted_score, _adjusted_verdict, verdict_would_flip = apply_verifier_penalty(raw_score, verifier_output)
-    await report_repository.patch_verifier(public_id, verifier_output, adjusted_score, verdict_would_flip)
+    await report_repository.patch_verifier(
+        public_id, verifier_output, adjusted_score, verdict_would_flip,
+        additional_cost_usd=verifier_cost_usd,
+    )
 
 
-def _spawn_verifier_shadow(public_id: str, raw_score: int, results: dict[str, AgentOutput]) -> asyncio.Task:
-    task = asyncio.create_task(_run_verifier_shadow(public_id, raw_score, results))
+def _spawn_verifier_shadow(
+    public_id: str, raw_score: int, results: dict[str, AgentOutput], cost_marker: int,
+) -> asyncio.Task:
+    task = asyncio.create_task(_run_verifier_shadow(public_id, raw_score, results, cost_marker))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task
@@ -199,6 +232,20 @@ async def _run_pipeline(
 ) -> None:
     """Runs all agents, streams progress onto `queue`, aggregates, and
     persists — regardless of whether anything is still reading `queue`."""
+    # C2: this pipeline runs as its own detached asyncio.Task (see
+    # spawn_pipeline) rather than inline with the request — so it can't
+    # rely on the request's contextvars (bound by core.middleware /
+    # core.session, and cleared once the request itself finishes); it
+    # binds session_id into its OWN task-local context instead, since it
+    # already has session_id as an explicit parameter.
+    if session_id:
+        structlog.contextvars.bind_contextvars(session_id=session_id)
+
+    # C3: seeded before any agent task is spawned — every agent.run() call
+    # below (and the Verifier, whichever wave it runs in) shares this run's
+    # one cost ledger. See services/cost_tracking.py's module docstring.
+    cost_tracking.start_cost_tracking()
+
     initial_state: GraphState = {
         "transcript": transcript,
         "keyword": keyword,
@@ -208,6 +255,22 @@ async def _run_pipeline(
         "verdict": None,
         "errors": [],
     }
+
+    # B3/B4: computed up front from the signals already gathered for this
+    # request — independent of the agents (no LLM call, rule-based), so
+    # it's ready to stream before any agent finishes and doesn't wait on
+    # them. Both are disclosure layers only; neither touches scoring.
+    signal_quality, low_confidence, signal_quality_by_source = compute_report_signal_quality(signals)
+    conflicts_detected = detect_conflicts(signals)
+    await queue.put({
+        "type": "signal_quality",
+        "payload": {
+            "signal_quality": signal_quality,
+            "low_confidence": low_confidence,
+            "signal_quality_by_source": signal_quality_by_source,
+            "conflicts": conflicts_detected,
+        },
+    })
 
     tasks: dict[str, asyncio.Task] = {}
     for i, agent in enumerate(ALL_AGENTS):
@@ -226,6 +289,8 @@ async def _run_pipeline(
     verifier_output: VerifierOutput | None = None
     adjusted_score: int | None = None
     verdict_would_flip = False
+    report_cost_usd = 0.0
+    cost_marker = 0
     wave1_started_at = time.monotonic()
 
     try:
@@ -248,7 +313,10 @@ async def _run_pipeline(
 
         raw_score, verdict = aggregate_results(results)
         gated_score, gated_verdict = raw_score, verdict
-        logger.info("wave1_complete elapsed_s=%.2f", time.monotonic() - wave1_started_at)
+        logger.info(
+            "wave1_complete",
+            duration_s=round(time.monotonic() - wave1_started_at, 2), status="ok",
+        )
 
         if VERIFIER_PENALTY_ENABLED:
             # Blocking wave 2 — Verifier is on the critical path, and the
@@ -257,8 +325,8 @@ async def _run_pipeline(
                 wave2_started_at = time.monotonic()
                 verifier_output = await verifier_agent.run(results)
                 logger.info(
-                    "wave2_complete elapsed_s=%.2f blocking=True",
-                    time.monotonic() - wave2_started_at,
+                    "wave2_complete",
+                    duration_s=round(time.monotonic() - wave2_started_at, 2), blocking=True, status="ok",
                 )
                 adjusted_score, gated_verdict, verdict_would_flip = apply_verifier_penalty(
                     raw_score, verifier_output
@@ -267,7 +335,15 @@ async def _run_pipeline(
                 gating_score = "adjusted"
             except Exception:
                 errors.append("verifier: blocking call failed — gated on raw_score instead.")
-                logger.error("Blocking Verifier call failed — falling back to raw_score.", exc_info=True)
+                logger.error("verifier_blocking_call_failed", status="error", fallback="raw_score", exc_info=True)
+
+        # C3: marker taken right after wave 1 (and, in blocking mode, wave
+        # 2 too — both run in THIS task, so both are already in the
+        # ledger by now) — read once, right before persisting, so the
+        # shadow-mode spawn below knows exactly where its own Verifier
+        # call's cost starts in the shared ledger.
+        cost_marker = len(cost_tracking.get_ledger())
+        report_cost_usd = cost_tracking.get_total_cost_usd()
 
         public_id = generate_public_id() if session_id else None
         await queue.put(
@@ -289,12 +365,15 @@ async def _run_pipeline(
             public_id=public_id,
             verifier=verifier_output, adjusted_score=adjusted_score,
             gating_score=gating_score, verdict_would_flip=verdict_would_flip,
+            signal_quality=signal_quality, signal_quality_by_source=signal_quality_by_source,
+            low_confidence=low_confidence, conflicts_detected=conflicts_detected,
+            report_cost_usd=report_cost_usd,
         )
         if saved_public_id and not VERIFIER_PENALTY_ENABLED:
             # Shadow mode: Verifier hasn't run yet — kick it off now,
             # independent of this task's own completion, and patch the
             # doc when it lands. Never blocks the SSE stream.
-            _spawn_verifier_shadow(saved_public_id, raw_score, results)
+            _spawn_verifier_shadow(saved_public_id, raw_score, results, cost_marker)
 
 
 def spawn_pipeline(

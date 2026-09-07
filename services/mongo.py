@@ -6,13 +6,12 @@ it first so a down/unreachable Mongo degrades the app instead of crashing
 requests. Unlike cache.py, there is no in-memory fallback here — when
 Mongo is unavailable, persistence is simply skipped.
 """
-import logging
-
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from core.config import MONGODB_DB, MONGODB_URI
+from core.logging import get_logger
 
-logger = logging.getLogger("notaflop.mongo")
+logger = get_logger("notaflop.mongo")
 
 _client: AsyncIOMotorClient | None = None
 _db: AsyncIOMotorDatabase | None = None
@@ -28,11 +27,11 @@ async def connect() -> None:
         await _client.admin.command("ping")
         _db = _client[MONGODB_DB]
         _mongo_available = True
-        logger.info("MongoDB connected (db=%s)", MONGODB_DB)
+        logger.info("mongo_connected", db=MONGODB_DB, status="ok")
     except Exception:
         _mongo_available = False
         _db = None
-        logger.error("MongoDB unreachable at startup — persistence disabled.", exc_info=True)
+        logger.error("mongo_unreachable_at_startup", status="unavailable", exc_info=True)
 
 
 async def disconnect() -> None:
@@ -58,4 +57,4 @@ def mark_unavailable(exc: Exception) -> None:
     Mongo that dies mid-run also stops being hit on every subsequent call."""
     global _mongo_available
     _mongo_available = False
-    logger.error("MongoDB operation failed — persistence disabled.", exc_info=exc)
+    logger.error("mongo_operation_failed", status="unavailable", exc_info=exc)

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from core.dependencies import enforce_rate_limit
 from core.session import SESSION_HEADER, SessionContext
+from core.validation import TranscriptValidationError, validate_transcript
 from orchestrator.graph import stream_analysis
 
 from services.keyword_extractor import extract_keyword, KeywordExtractionError
@@ -17,6 +18,16 @@ class AnalyzeRequest(BaseModel):
     signals: dict                      # from Phase 2 smart data layer
     filter_result: dict | None = None  # Phase 1 result, persisted alongside the report if supplied
 
+    @field_validator("transcript")
+    @classmethod
+    def _validate_transcript(cls, value: str) -> str:
+        # C5: shared across every transcript entry path — see
+        # core/validation.py's module docstring.
+        try:
+            return validate_transcript(value)
+        except TranscriptValidationError as exc:
+            raise ValueError(exc.detail) from exc
+
 
 @router.post("/analyze")
 async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforce_rate_limit)):
@@ -26,17 +37,23 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforc
     Final event contains the aggregated score + verdict.
 
     SSE event types:
-      { type: "agent",       payload: AgentOutput }
-      { type: "agent_error", payload: { agent, error } }
-      { type: "final",       payload: { public_id, score, verdict, errors } }
+      { type: "signal_quality", payload: { signal_quality, low_confidence, signal_quality_by_source, conflicts } }
+      { type: "agent",          payload: AgentOutput }
+      { type: "agent_error",    payload: { agent, error } }
+      { type: "final",          payload: { public_id, score, verdict, errors } }
       [DONE]
+
+    signal_quality/conflicts are a disclosure layer, not a scoring input —
+    they never change score/verdict, only how much live market evidence
+    backed it and whether sources disagreed.
 
     Rate limited: 3/day per session (primary), 15/day per ip (cost
     backstop). Exceeding either returns 429 with a structured body
     (limit, remaining, reset_at, scope) — see models.schemas.RateLimitError.
     """
-    if not body.transcript.strip():
-        raise HTTPException(status_code=400, detail="Transcript is empty.")
+    # C5: empty/whitespace-only/too-long/control-character transcripts are
+    # already rejected with a structured 422 by AnalyzeRequest's own
+    # field_validator (core/validation.py) before this handler ever runs.
 
     # TODO: Revisit making filter_result required once frontend reliably passes it on every call.
     if body.filter_result and body.filter_result.get("verdict") == "fail":

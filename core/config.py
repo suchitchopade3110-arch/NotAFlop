@@ -28,5 +28,38 @@ RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", str(24 * 
 # Verifier
 VERIFIER_PENALTY_ENABLED: bool = os.getenv("VERIFIER_PENALTY_ENABLED", "false").lower() == "true"
 
+# Internal/admin endpoints (e.g. GET /internal/verifier/stats). Empty by
+# default, which fails the admin dependency closed (see
+# core.dependencies.require_admin) rather than leaving an internal route
+# open with no credential to check against.
+ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
+
+# Cost estimation (C3) — approximate USD-per-million-token prices, for
+# per-call/per-report cost *observability*, not billing-grade figures.
+# Override via env if Groq's published pricing changes; unlisted models
+# fall back to the GROQ_DEFAULT_* pair below.
+GROQ_PRICE_PER_MILLION_TOKENS: dict[str, dict[str, float]] = {
+    "llama-3.3-70b-versatile": {
+        "prompt": float(os.getenv("GROQ_PRICE_LLAMA_70B_PROMPT", "0.59")),
+        "completion": float(os.getenv("GROQ_PRICE_LLAMA_70B_COMPLETION", "0.79")),
+    },
+    "llama-3.1-8b-instant": {
+        "prompt": float(os.getenv("GROQ_PRICE_LLAMA_8B_PROMPT", "0.05")),
+        "completion": float(os.getenv("GROQ_PRICE_LLAMA_8B_COMPLETION", "0.08")),
+    },
+}
+GROQ_DEFAULT_PROMPT_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_PROMPT_PRICE_PER_M", "0.59"))
+GROQ_DEFAULT_COMPLETION_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_COMPLETION_PRICE_PER_M", "0.79"))
+
+# Input validation (C5). Applies uniformly to every transcript entry path
+# — typed text, audio (post-Whisper), and any future video-transcript
+# path — via core.validation.validate_transcript().
+TRANSCRIPT_MAX_LENGTH: int = int(os.getenv("TRANSCRIPT_MAX_LENGTH", "5000"))
+
+# CORS (C6) — see core/cors.py for the resolution rule (env-driven,
+# localhost default only in development, fails loudly otherwise).
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").strip().lower()
+CORS_ALLOWED_ORIGINS_RAW: str = os.getenv("CORS_ALLOWED_ORIGINS", "")
+
 # Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
 # it versions, instead of here — stamped on every report at write time.

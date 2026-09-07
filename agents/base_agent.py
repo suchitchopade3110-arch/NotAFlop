@@ -25,7 +25,7 @@ class BaseAgent(ABC):
 
     async def run(self, state: dict) -> AgentOutput:
         user_msg = self.build_user_message(state)
-        raw = await chat(self.model, self.system_prompt, user_msg, self.max_tokens)
+        raw = await chat(self.model, self.system_prompt, user_msg, self.max_tokens, agent_name=self.name)
 
         try:
             data = json.loads(raw)

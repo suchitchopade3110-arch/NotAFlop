@@ -15,7 +15,7 @@ def _results() -> dict[str, AgentOutput]:
 
 
 async def test_run_parses_valid_response(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         assert model == REASONING_MODEL
         return json.dumps({
             "confidence_score": 2,
@@ -35,7 +35,7 @@ async def test_run_parses_valid_response(monkeypatch):
 
 
 async def test_run_high_confidence_when_no_conflicts(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         return json.dumps({
             "confidence_score": 10,
             "conflicts": [],
@@ -52,7 +52,7 @@ async def test_run_high_confidence_when_no_conflicts(monkeypatch):
 
 
 async def test_run_degrades_on_malformed_response(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         return "not json"
 
     monkeypatch.setattr("agents.verifier.chat", _fake_chat)
@@ -66,7 +66,7 @@ async def test_run_degrades_on_malformed_response(monkeypatch):
 async def test_user_message_includes_all_agent_evidence(monkeypatch):
     captured = {}
 
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         captured["user"] = user
         return json.dumps({"confidence_score": 8, "evidence": "e", "feedback": "f"})
 

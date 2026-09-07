@@ -8,6 +8,7 @@ from models.documents import VerifierOutput
 from orchestrator import graph
 from orchestrator.state import AgentOutput
 from repositories import report_repository
+from services import cost_tracking
 
 
 def _patch_agents(monkeypatch, score=8):
@@ -65,6 +66,12 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
     assert final_events[0]["payload"]["score"] > 0
     assert len([i for i in items if i["type"] == "agent"]) == len(ALL_AGENTS)
 
+    # B3: signal_quality streams first, ahead of any agent event — one
+    # reddit source present -> low_confidence (< 2 live sources).
+    assert items[0]["type"] == "signal_quality"
+    assert items[0]["payload"]["low_confidence"] is True
+    assert items[0]["payload"]["signal_quality_by_source"]["reddit"] > 0
+
     docs = await report_repository.list_by_session("sess-1")
     assert len(docs) == 1
     doc = docs[0]
@@ -75,6 +82,77 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
     assert set(doc.agent_results.keys()) == {a.name for a in ALL_AGENTS}
     assert doc.agent_results["problem"].model == graph._AGENT_MODEL_BY_NAME["problem"]
     assert doc.tier_reached == 2  # score 8/10 across the board clears PIVOT_THRESHOLD
+    assert doc.low_confidence is True
+    assert doc.signal_quality > 0
+    assert doc.signal_quality_by_source["reddit"] > 0
+    # B4: single-source signals here -> nothing to cross-check for conflicts.
+    assert doc.conflicts == []
+    assert items[0]["payload"]["conflicts"] == []
+
+
+async def test_conflicting_signals_are_streamed_and_persisted(mongo_db, monkeypatch):
+    """B4: a real cross-source conflict in the signals passed to /analyze
+    shows up in the signal_quality SSE event and on the persisted doc."""
+    _patch_agents(monkeypatch, score=8)
+
+    conflicting_signals = {
+        "google_trends": {"trend": "declining", "raw": [80, 60, 40]},
+        "reddit": {"pain_frequency": "high", "post_count": 50},
+    }
+
+    queue: asyncio.Queue = asyncio.Queue()
+    task = graph.spawn_pipeline(
+        queue, "Uber for dogs", "dog walking", conflicting_signals,
+        session_id="sess-conflict", ip="1.2.3.4",
+    )
+    items = await _drain(queue)
+    await task
+    await _drain_background_tasks()
+
+    assert items[0]["type"] == "signal_quality"
+    assert len(items[0]["payload"]["conflicts"]) == 1
+    assert items[0]["payload"]["conflicts"][0]["dimension"] == "interest_vs_pain"
+
+    doc = (await report_repository.list_by_session("sess-conflict"))[0]
+    assert len(doc.conflicts) == 1
+    assert doc.conflicts[0]["dimension"] == "interest_vs_pain"
+
+
+async def test_report_cost_usd_persisted_and_topped_up_after_shadow_verifier(mongo_db, monkeypatch):
+    """C3: each agent's simulated Groq call records a cost into the run's
+    ledger; the report is persisted with the wave-1 total, then the
+    shadow Verifier's own cost is $inc'd on afterward (it runs in a
+    separate task spawned after that initial total was already read)."""
+    for agent in ALL_AGENTS:
+        async def _run(state, _name=agent.name):
+            cost_tracking.record_call(_name, "m", 100, 50)
+            return AgentOutput(agent=_name, passed=True, score=8, evidence="e", feedback="f")
+        monkeypatch.setattr(agent, "run", _run)
+
+    async def _fake_verifier_run(results):
+        cost_tracking.record_call("verifier", "m", 200, 80)
+        return VerifierOutput(confidence_score=9, passed=True, evidence="e", feedback="f", model="m")
+    monkeypatch.setattr(verifier_module, "run", _fake_verifier_run)
+
+    queue: asyncio.Queue = asyncio.Queue()
+    task = graph.spawn_pipeline(
+        queue, "Uber for dogs", "dog walking", {}, session_id="sess-cost", ip="1.2.3.4",
+    )
+    await _drain(queue)
+    await task
+
+    # Persisted immediately after wave 1 -> only the 12 agents' cost, not
+    # the shadow Verifier's (hasn't run yet).
+    doc = (await report_repository.list_by_session("sess-cost"))[0]
+    agents_only_cost = doc.report_cost_usd
+    assert agents_only_cost > 0
+
+    await _drain_background_tasks()  # let the shadow Verifier finish and patch
+
+    doc = (await report_repository.list_by_session("sess-cost"))[0]
+    assert doc.report_cost_usd > agents_only_cost  # verifier's cost added on top
+    expected_verifier_cost = cost_tracking.compute_cost_usd("m", 200, 80)
+    assert round(doc.report_cost_usd - agents_only_cost, 8) == expected_verifier_cost
 
 
 async def test_no_persist_without_session_id(mongo_db, monkeypatch):

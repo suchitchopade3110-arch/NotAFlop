@@ -28,7 +28,7 @@ def _bypass_rate_limit():
 
 
 async def test_extract_keyword_success(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         assert model == FILTER_MODEL
         return "AI code review"
 
@@ -38,7 +38,7 @@ async def test_extract_keyword_success(monkeypatch):
 
 
 async def test_extract_keyword_too_short(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         return "a"
 
     monkeypatch.setattr("services.keyword_extractor.chat", _fake_chat)
@@ -47,7 +47,7 @@ async def test_extract_keyword_too_short(monkeypatch):
 
 
 async def test_extract_keyword_too_long(monkeypatch):
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         return "one two three four five six seven eight nine ten words"
 
     monkeypatch.setattr("services.keyword_extractor.chat", _fake_chat)
@@ -138,7 +138,7 @@ async def test_analyze_extracts_keyword_when_field_absent_end_to_end(monkeypatch
         return VerifierOutput(confidence_score=9, passed=True, evidence="e", feedback="f", model="m")
     monkeypatch.setattr(verifier_module, "run", _fake_verifier_run)
 
-    async def _fake_chat(model, system, user, max_tokens):
+    async def _fake_chat(model, system, user, max_tokens, **kwargs):
         assert model == FILTER_MODEL
         return "auto extracted topic"
     monkeypatch.setattr("services.keyword_extractor.chat", _fake_chat)

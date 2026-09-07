@@ -9,6 +9,8 @@ asyncpraw>=8.0.0
 langgraph>=0.2.0
 motor>=3.5.0
 nanoid>=2.0.0
+tenacity>=9.0.0
+structlog>=24.1.0
 
 # Dev / test only
 pytest>=8.2.0

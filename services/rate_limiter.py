@@ -14,16 +14,16 @@ quota early by waiting for a fixed boundary to roll over.
 Fails open on any unexpected error, not just a down Redis: an infra
 bug must never block a legitimate free report generation.
 """
-import logging
 import time
 from dataclasses import dataclass
 
 from redis.exceptions import RedisError
 
 from core.config import RATE_LIMIT_IP_MAX, RATE_LIMIT_SESSION_MAX, RATE_LIMIT_WINDOW_SECONDS
+from core.logging import get_logger
 from services.cache import get_client
 
-logger = logging.getLogger("notaflop.rate_limiter")
+logger = get_logger("notaflop.rate_limiter")
 
 _redis_available = True
 _memory_store: dict[str, list[float]] = {}
@@ -69,8 +69,8 @@ async def _check_one(scope: str, key: str, max_count: int, window: int) -> RateL
                 count = await _count_and_record_redis(key, window, now)
             except RedisError:
                 logger.error(
-                    "Redis rate-limit check failed for %s — falling back to in-memory.",
-                    key, exc_info=True,
+                    "rate_limit_redis_check_failed",
+                    key=key, status="falling_back_to_memory", exc_info=True,
                 )
                 _redis_available = False
                 count = _count_and_record_memory(key, window, now)
@@ -83,9 +83,7 @@ async def _check_one(scope: str, key: str, max_count: int, window: int) -> RateL
             reset_at=reset_at, scope=scope,
         )
     except Exception:
-        logger.error(
-            "Rate limiter failed unexpectedly for %s — failing open.", key, exc_info=True,
-        )
+        logger.error("rate_limit_unexpected_failure", key=key, status="failing_open", exc_info=True)
         return RateLimitResult(
             allowed=True, limit=max_count, remaining=max_count, reset_at=reset_at, scope=scope,
         )

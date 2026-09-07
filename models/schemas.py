@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from core.validation import TranscriptValidationError, validate_transcript
 from models.documents import AgentResultRecord, VerifierOutput
 
 
@@ -15,6 +16,16 @@ class TranscribeResponse(BaseModel):
 # ── Filter ────────────────────────────────────────────────────
 class FilterRequest(BaseModel):
     transcript: str
+
+    @field_validator("transcript")
+    @classmethod
+    def _validate_transcript(cls, value: str) -> str:
+        # C5: shared across every transcript entry path — see
+        # core/validation.py's module docstring.
+        try:
+            return validate_transcript(value)
+        except TranscriptValidationError as exc:
+            raise ValueError(exc.detail) from exc
 
 
 class AgentResult(BaseModel):
@@ -63,6 +74,12 @@ class ReportResponse(BaseModel):
     agent_results: dict[str, AgentResultRecord]
     verifier: VerifierOutput | None = None
 
+    signal_quality: float = 0.0
+    signal_quality_by_source: dict[str, float] = Field(default_factory=dict)
+    low_confidence: bool = False
+    conflicts: list[dict] = Field(default_factory=list)
+    report_cost_usd: float = 0.0
+
     weights_version: int
     raw_score: int
     adjusted_score: int | None = None
@@ -84,6 +101,17 @@ class ReportSummary(BaseModel):
     verdict: str
     tier_reached: int
     created_at: datetime
+
+
+class VerifierDivergenceStats(BaseModel):
+    """GET /internal/verifier/stats — shadow-mode divergence between
+    raw_score and adjusted_score across stored report snapshots that
+    carry a Verifier result. Read-only observability, no gating."""
+
+    count: int
+    mean_absolute_delta: float
+    max_delta: int
+    distribution: dict[str, int]
 
 
 class RateLimitError(BaseModel):

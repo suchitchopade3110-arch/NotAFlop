@@ -58,7 +58,7 @@ def _build_user_message(results: dict[str, AgentOutput]) -> str:
 
 async def run(results: dict[str, AgentOutput]) -> VerifierOutput:
     user_msg = _build_user_message(results)
-    raw = await chat(MODEL, SYSTEM_PROMPT, user_msg, MAX_TOKENS)
+    raw = await chat(MODEL, SYSTEM_PROMPT, user_msg, MAX_TOKENS, agent_name="verifier")
 
     try:
         data = json.loads(raw)

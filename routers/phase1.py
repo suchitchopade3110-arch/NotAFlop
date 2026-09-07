@@ -4,6 +4,7 @@ from models.schemas import TranscribeResponse, FilterRequest, FilterResponse
 from services.groq_client import transcribe_audio
 from agents import narrow_problem, pitch_clarity
 from core.config import AUDIO_MAX_BYTES
+from core.validation import TranscriptValidationError, validate_transcript
 
 router = APIRouter()
 
@@ -28,6 +29,14 @@ async def transcribe(audio: UploadFile = File(...)):
     if not transcript:
         raise HTTPException(status_code=422, detail="No speech detected. Please re-record.")
 
+    # C5: same validation every transcript entry path goes through — no
+    # request-body Pydantic model to hook here since the transcript only
+    # exists after the Whisper call above, so it's applied explicitly.
+    try:
+        transcript = validate_transcript(transcript)
+    except TranscriptValidationError as exc:
+        raise HTTPException(status_code=422, detail={"violation": exc.violation, "detail": exc.detail})
+
     return TranscribeResponse(transcript=transcript)
 
 
@@ -35,9 +44,11 @@ async def transcribe(audio: UploadFile = File(...)):
 async def filter_idea(body: FilterRequest):
     """Run Narrow Problem Filter + Pitch Clarity Scorer in parallel."""
 
-    transcript = body.transcript.strip()
-    if not transcript:
-        raise HTTPException(status_code=400, detail="Transcript is empty.")
+    # C5: empty/whitespace-only/too-long/control-character transcripts are
+    # already rejected with a structured 422 by FilterRequest's own
+    # field_validator (core/validation.py) before this handler ever runs
+    # — body.transcript here is already sanitized.
+    transcript = body.transcript
 
     # Run both agents in parallel
     narrow_result, clarity_result = await asyncio.gather(
