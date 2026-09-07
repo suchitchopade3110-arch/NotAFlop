@@ -65,6 +65,12 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
     assert final_events[0]["payload"]["score"] > 0
     assert len([i for i in items if i["type"] == "agent"]) == len(ALL_AGENTS)
 
+    # B3: signal_quality streams first, ahead of any agent event — one
+    # reddit source present -> low_confidence (< 2 live sources).
+    assert items[0]["type"] == "signal_quality"
+    assert items[0]["payload"]["low_confidence"] is True
+    assert items[0]["payload"]["signal_quality_by_source"]["reddit"] > 0
+
     docs = await report_repository.list_by_session("sess-1")
     assert len(docs) == 1
     doc = docs[0]
@@ -75,6 +81,9 @@ async def test_spawn_pipeline_streams_and_persists(mongo_db, monkeypatch):
     assert set(doc.agent_results.keys()) == {a.name for a in ALL_AGENTS}
     assert doc.agent_results["problem"].model == graph._AGENT_MODEL_BY_NAME["problem"]
     assert doc.tier_reached == 2  # score 8/10 across the board clears PIVOT_THRESHOLD
+    assert doc.low_confidence is True
+    assert doc.signal_quality > 0
+    assert doc.signal_quality_by_source["reddit"] > 0
 
 
 async def test_no_persist_without_session_id(mongo_db, monkeypatch):

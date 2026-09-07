@@ -54,6 +54,11 @@ class ReportDocument(BaseModel):
     signals: dict = Field(default_factory=dict)
     filter_result: dict | None = None
 
+    # B3: disclosure layer over `signals` — never feeds back into scoring.
+    signal_quality: float = 0.0
+    signal_quality_by_source: dict[str, float] = Field(default_factory=dict)
+    low_confidence: bool = False
+
     agent_results: dict[str, AgentResultRecord] = Field(default_factory=dict)
     verifier: VerifierOutput | None = None
 

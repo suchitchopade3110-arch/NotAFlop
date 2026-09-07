@@ -26,10 +26,14 @@ async def analyze(body: AnalyzeRequest, session: SessionContext = Depends(enforc
     Final event contains the aggregated score + verdict.
 
     SSE event types:
-      { type: "agent",       payload: AgentOutput }
-      { type: "agent_error", payload: { agent, error } }
-      { type: "final",       payload: { public_id, score, verdict, errors } }
+      { type: "signal_quality", payload: { signal_quality, low_confidence, signal_quality_by_source } }
+      { type: "agent",          payload: AgentOutput }
+      { type: "agent_error",    payload: { agent, error } }
+      { type: "final",          payload: { public_id, score, verdict, errors } }
       [DONE]
+
+    signal_quality is a disclosure layer, not a scoring input — it never
+    changes score/verdict, only how much live market evidence backed it.
 
     Rate limited: 3/day per session (primary), 15/day per ip (cost
     backstop). Exceeding either returns 429 with a structured body

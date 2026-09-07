@@ -63,6 +63,10 @@ class ReportResponse(BaseModel):
     agent_results: dict[str, AgentResultRecord]
     verifier: VerifierOutput | None = None
 
+    signal_quality: float = 0.0
+    signal_quality_by_source: dict[str, float] = Field(default_factory=dict)
+    low_confidence: bool = False
+
     weights_version: int
     raw_score: int
     adjusted_score: int | None = None
