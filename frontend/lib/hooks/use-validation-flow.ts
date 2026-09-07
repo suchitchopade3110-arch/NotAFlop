@@ -176,7 +176,7 @@ export function useValidationFlow() {
               score: 0,
               passed: false,
               evidence: "",
-              feedback: "This dimension could not be scored — treated as missing, not as a zero.",
+              feedback: "This dimension could not be scored. It's treated as missing, not as a zero.",
             };
             dims.push(dim);
             setDimensions((prev) => [...prev, dim]);

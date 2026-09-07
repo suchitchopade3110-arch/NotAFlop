@@ -35,7 +35,7 @@ export function EvidencePanel({ ideaId, onEvidenceSubmitted }: EvidencePanelProp
             </p>
           ) : (
             <p className="mt-1 text-body text-ink-muted">
-              This evidence type doesn&apos;t trigger an automatic re-score on its own — it&apos;s saved
+              This evidence type doesn&apos;t trigger an automatic re-score on its own. It&apos;s saved
               to your idea&apos;s history.
             </p>
           )}

@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const card = await fetchShareCard(token);
   if (!card) return { title: "Verdict not found" };
 
-  const title = `${card.keyword || "This idea"} — ${card.verdict.toUpperCase()} (${card.raw_score}/100)`;
+  const title = `${card.keyword || "This idea"}: ${card.verdict.toUpperCase()} (${card.raw_score}/100)`;
   const description = card.top_reasons.slice(0, 2).join(". ") || "A NotAFlop verdict, grounded in live market signals.";
 
   return {
@@ -35,7 +35,7 @@ export default async function SharePage({ params }: PageProps) {
         <p className="text-heading-sm text-ink">This verdict isn&apos;t available</p>
         <p className="mt-2 max-w-sm text-body text-ink-muted">
           The link may be wrong, the idea may have been deleted, or you&apos;re requesting too
-          quickly — try again shortly.
+          quickly. Try again shortly.
         </p>
         <Link href="/" className="mt-5">
           <Button variant="secondary">Back to NotAFlop</Button>

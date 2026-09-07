@@ -59,7 +59,7 @@ export function CriterionForm({ ideaId, onCreated }: { ideaId: string; onCreated
     <Card elevation="flat" as="section">
       <p className="text-heading-sm text-ink">Set a kill criterion</p>
       <p className="mt-1 text-body text-ink-muted">
-        Write the exact result that would prove this idea wrong — a statement that could actually
+        Write the exact result that would prove this idea wrong: a statement that could actually
         fail, not a hope.
       </p>
 
@@ -70,7 +70,7 @@ export function CriterionForm({ ideaId, onCreated }: { ideaId: string; onCreated
           value={statement}
           onChange={(e) => setStatement(e.target.value)}
           rows={3}
-          hint={statementTooVague ? "A bit more specificity — name the number and the group." : undefined}
+          hint={statementTooVague ? "A bit more specificity: name the number and the group." : undefined}
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input

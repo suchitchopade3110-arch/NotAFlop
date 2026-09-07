@@ -37,7 +37,7 @@ export function NoGoVerdict({ publicId, topRisks }: { publicId: string | null; t
       <Card elevation="glow" className="flex flex-col items-center gap-3 text-center">
         <p className="text-heading-sm text-ink">This is worth putting somewhere</p>
         <p className="max-w-sm text-body text-ink-muted">
-          A No-Go against a specific pitch, benchmarked against a known startup failure — a real
+          A No-Go against a specific pitch, benchmarked against a known startup failure: a real
           artifact, not a dead end.
         </p>
         <ShareCta publicId={publicId} size="lg" label="Get my shareable card" />

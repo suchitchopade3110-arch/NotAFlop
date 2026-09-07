@@ -56,7 +56,7 @@ export function ComingSoonPage() {
       </p>
 
       {status === "done" ? (
-        <p className="mt-8 text-body text-go">You&apos;re on the list — we&apos;ll email you at launch.</p>
+        <p className="mt-8 text-body text-go">You&apos;re on the list. We&apos;ll email you at launch.</p>
       ) : (
         <form onSubmit={handleSubmit} className="mt-8 flex w-full max-w-sm flex-col gap-3 sm:flex-row">
           <div className="flex-1">

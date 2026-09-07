@@ -4,7 +4,7 @@ import { SkeletonLine } from "@/components/ui/skeleton";
 
 const VERDICT_COPY: Record<string, { word: string; blurb: string }> = {
   go: { word: "Go", blurb: "This idea cleared the bar on live evidence." },
-  pivot: { word: "Pivot", blurb: "Not there yet — but the redirect is concrete, not vague." },
+  pivot: { word: "Pivot", blurb: "Not there yet, but the redirect is concrete, not vague." },
   "no-go": { word: "No-Go", blurb: "This idea did not clear the bar as pitched." },
 };
 

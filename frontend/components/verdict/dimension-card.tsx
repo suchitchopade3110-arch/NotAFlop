@@ -28,7 +28,7 @@ export function DimensionCard({ dimensionKey, result, active }: DimensionCardPro
           <DimensionScore score={result.score} className="shrink-0" />
         ) : (
           <span className="text-mono shrink-0 text-ink-faint" aria-hidden="true">
-            {active ? "···" : "—"}
+            {active ? "···" : "·"}
           </span>
         )}
       </div>

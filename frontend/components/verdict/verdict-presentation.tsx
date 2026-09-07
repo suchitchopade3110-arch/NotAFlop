@@ -26,7 +26,7 @@ export function VerdictPresentation({ verdict }: VerdictPresentationProps) {
     <section className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14">
       {verdict.recovered && (
         <p className="mb-6 rounded-lg border border-border bg-charcoal px-4 py-2 text-body text-ink-faint">
-          Reconnected after a dropped connection — this verdict finished on our servers.
+          Reconnected after a dropped connection. This verdict finished on our servers.
         </p>
       )}
 

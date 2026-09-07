@@ -126,7 +126,7 @@ export function PitchForm({ initialValue = "", onSubmit, submitting, submitLabel
             {recording ? "Stop recording" : "Start recording"}
           </Button>
           <p className="text-body text-ink-muted" aria-live="polite">
-            {recording ? "Recording — speak your pitch, then stop." : transcribing ? "Transcribing..." : "Say your pitch out loud."}
+            {recording ? "Recording. Speak your pitch, then stop." : transcribing ? "Transcribing..." : "Say your pitch out loud."}
           </p>
         </div>
       )}

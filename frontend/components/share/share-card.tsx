@@ -42,7 +42,7 @@ export function ShareCard({ card }: { card: ShareCardResponse }) {
         {benchmark && (
           <div className="mt-5 rounded-xl border border-border-soft bg-obsidian/60 px-4 py-3">
             <p className="text-body text-ink-muted">
-              Reminds us of <span className="text-ink">{benchmark.name}</span> ({benchmark.year}) — it{" "}
+              Reminds us of <span className="text-ink">{benchmark.name}</span> ({benchmark.year}): it{" "}
               {benchmark.lesson}
             </p>
           </div>
@@ -55,7 +55,7 @@ export function ShareCard({ card }: { card: ShareCardResponse }) {
         href="/"
         className="mt-6 text-body text-gold-bright underline-offset-4 hover:underline"
       >
-        Validate your own idea — free
+        Validate your own idea, free
       </Link>
     </div>
   );

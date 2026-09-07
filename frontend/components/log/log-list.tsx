@@ -43,7 +43,7 @@ export function LogList() {
     return (
       <EmptyState
         title="Nothing tracked yet"
-        description="A log is a durable record of one idea's score over time — every re-run, every piece of evidence, every kill-criterion you set. Validate a pitch and choose to keep it to start one."
+        description="A log is a durable record of one idea's score over time: every re-run, every piece of evidence, every kill-criterion you set. Validate a pitch and choose to keep it to start one."
         action={
           <Link href="/">
             <Button>Validate an idea</Button>

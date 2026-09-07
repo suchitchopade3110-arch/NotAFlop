@@ -21,7 +21,7 @@ export function CriteriaPanel({ ideaId }: { ideaId: string }) {
       {criteria && criteria.length === 0 && (
         <EmptyState
           title="No commitments yet"
-          description="A kill criterion is a falsifiable line in the sand — set one above."
+          description="A kill criterion is a falsifiable line in the sand. Set one above."
         />
       )}
       {criteria && criteria.length > 0 && (

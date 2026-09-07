@@ -34,7 +34,7 @@ function SnapshotEntry({ payload }: { payload: Record<string, unknown> }) {
         </Badge>
         {versionCrossing && (
           <Badge tone="gold" title="Scoring weights changed between these two snapshots">
-            weights changed — not like-for-like
+            weights changed, not like-for-like
           </Badge>
         )}
       </div>

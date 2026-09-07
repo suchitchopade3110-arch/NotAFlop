@@ -30,8 +30,8 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "NotAFlop — Validate your startup idea before you build it",
-    template: "%s — NotAFlop",
+    default: "NotAFlop: validate your startup idea before you build it",
+    template: "%s · NotAFlop",
   },
   description:
     "Pitch your idea. Get a scored verdict grounded in live market signals. Free forever, no account required.",

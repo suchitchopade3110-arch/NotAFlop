@@ -58,7 +58,7 @@ export function ClaimPrompt() {
         <div>
           <p className="text-heading-sm text-ink">Want to know when this changes?</p>
           <p className="mt-1 text-body text-ink-muted">
-            Get a durable log for this idea — we&apos;ll tell you when the market moves for or
+            Get a durable log for this idea, and we&apos;ll tell you when the market moves for or
             against it.
           </p>
         </div>
