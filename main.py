@@ -15,8 +15,9 @@ from repositories import (
     session_repository,
     snapshot_repository,
 )
+from core.config import SNAPSHOT_SCHEDULER_ENABLED
 from routers import internal, phase1, phase2, phase3, phase4, phase5, reports, v1_auth, v1_ideas, v1_share
-from services import health, mongo
+from services import health, mongo, scheduler
 
 configure_logging()
 
@@ -32,7 +33,16 @@ async def lifespan(app: FastAPI):
     await snapshot_repository.ensure_indexes()
     await criteria_repository.ensure_indexes()
     await evidence_repository.ensure_indexes()
+
+    # C1: background snapshot scheduler — off by default (dev/test), see
+    # services/scheduler.py's module docstring.
+    if SNAPSHOT_SCHEDULER_ENABLED:
+        scheduler.start()
+
     yield
+
+    if SNAPSHOT_SCHEDULER_ENABLED:
+        await scheduler.stop()
     await mongo.disconnect()
 
 

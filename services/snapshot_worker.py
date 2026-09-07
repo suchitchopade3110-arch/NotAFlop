@@ -24,11 +24,14 @@ Re-run set is a cost decision (task C1), not a simplification:
     nothing in Phase 2 ever re-runs them past the initial snapshot.
 """
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 from agents.specialist_agents import ALL_AGENTS
+from core.config import SNAPSHOT_SCHEDULE_INTERVAL_DAYS
 from core.logging import get_logger
 from models.documents import IdeaDocument, SnapshotDocument
 from orchestrator.state import AgentOutput
+from repositories import idea_repository
 from services import cost_tracking, log_service
 from services.conflict_detector import detect_conflicts
 from services.signal_quality import compute_report_signal_quality
@@ -41,6 +44,11 @@ _AGENTS_BY_NAME = {agent.name: agent for agent in ALL_AGENTS}
 ALWAYS_RERUN_DIMENSIONS = ["timing", "tam", "moat"]
 EVIDENCE_GATED_DIMENSIONS = ["problem", "solution", "team", "unit_economics", "gtm", "ask"]
 NEVER_RERUN_DIMENSIONS = ["risk", "yc_signal", "lovers_test"]
+
+# Long enough to cover a real re-run (data layer fetch + 3 agent calls),
+# short enough that a crashed run self-heals instead of wedging the idea
+# for good.
+_SCHEDULER_LOCK_TTL_SECONDS = 15 * 60
 
 
 async def _run_dimensions(dims: list[str], transcript: str, signals: dict) -> dict[str, int]:
@@ -89,14 +97,66 @@ async def _run_market_sensitive(idea: IdeaDocument, trigger: str) -> SnapshotDoc
     )
 
 
+async def _run_locked(idea: IdeaDocument, trigger: str) -> SnapshotDocument | None:
+    """Idempotency guard (C1, constraint: 'idempotent per idea per
+    window'): a scheduler tick, a manual force-re-run, and an
+    overlapping sweep can never run a re-score for the same idea at the
+    same time. A failed/skipped acquire writes no snapshot and never
+    touches current_snapshot_id."""
+    if not await idea_repository.try_acquire_scheduler_lock(idea.idea_id, _SCHEDULER_LOCK_TTL_SECONDS):
+        logger.info("snapshot_run_skipped_locked", idea_id=idea.idea_id, trigger=trigger, status="skipped")
+        return None
+    try:
+        return await _run_market_sensitive(idea, trigger)
+    finally:
+        await idea_repository.release_scheduler_lock(idea.idea_id)
+
+
 async def run_scheduled_snapshot(idea: IdeaDocument) -> SnapshotDocument | None:
-    return await _run_market_sensitive(idea, "scheduled")
+    return await _run_locked(idea, "scheduled")
 
 
 async def run_manual_snapshot(idea: IdeaDocument) -> SnapshotDocument | None:
     """POST /v1/ideas/{id}/snapshots — same always-re-run set as the
     scheduler, just run on demand instead of waiting for the window."""
-    return await _run_market_sensitive(idea, "manual")
+    return await _run_locked(idea, "manual")
+
+
+async def is_due_for_scheduled_snapshot(idea: IdeaDocument, now: datetime | None = None) -> bool:
+    """An idea is due once its latest snapshot is older than
+    SNAPSHOT_SCHEDULE_INTERVAL_DAYS. Idea-level, not a stored 'next run
+    at' field — computed fresh each sweep from the snapshot history that
+    already exists, so it's never stale relative to a re-run that just
+    happened (scheduled, manual, or evidence-triggered all push this
+    out, since all three write a fresh 'latest' snapshot)."""
+    now = now or datetime.now(timezone.utc)
+    latest = await log_service.get_latest_snapshot(idea.idea_id)
+    if latest is None:
+        return True
+
+    # Motor/mongomock hand back naive datetimes on read (BSON dates carry
+    # no tz, and neither client is configured tz_aware) even though every
+    # write went in as UTC-aware (models.documents._utcnow) — normalize
+    # before comparing against an aware `now` rather than crashing.
+    created_at = latest.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+
+    return created_at + timedelta(days=SNAPSHOT_SCHEDULE_INTERVAL_DAYS) <= now
+
+
+async def sweep_due_ideas() -> list[SnapshotDocument]:
+    """The scheduler's periodic tick — every active idea due for a
+    re-run gets one. Idempotent per idea (via _run_locked), so this can
+    safely overlap with itself or with a founder's manual force-run."""
+    written: list[SnapshotDocument] = []
+    for idea in await idea_repository.list_active():
+        if not await is_due_for_scheduled_snapshot(idea):
+            continue
+        snapshot = await run_scheduled_snapshot(idea)
+        if snapshot is not None:
+            written.append(snapshot)
+    return written
 
 
 async def run_evidence_snapshot(idea: IdeaDocument, evidence_context: str) -> SnapshotDocument | None:

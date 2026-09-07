@@ -112,3 +112,68 @@ async def test_snapshot_cost_recorded(mongo_db, monkeypatch):
     monkeypatch.setattr(cost_tracking, "get_total_cost_usd", lambda: 0.03)
     snapshot = await snapshot_worker.run_scheduled_snapshot(idea)
     assert snapshot.cost == 0.03
+
+
+async def test_is_due_true_for_idea_with_no_snapshot_gap(mongo_db):
+    idea = await _seed_idea(mongo_db)
+    assert await snapshot_worker.is_due_for_scheduled_snapshot(idea) is False
+
+
+async def test_is_due_true_once_interval_elapsed(mongo_db):
+    import datetime as dt
+
+    from core.config import SNAPSHOT_SCHEDULE_INTERVAL_DAYS
+
+    idea = await _seed_idea(mongo_db)
+    future = dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=SNAPSHOT_SCHEDULE_INTERVAL_DAYS + 1)
+    assert await snapshot_worker.is_due_for_scheduled_snapshot(idea, now=future) is True
+
+
+async def test_locked_idea_skips_concurrent_run(mongo_db, monkeypatch):
+    from repositories import idea_repository
+
+    idea = await _seed_idea(mongo_db)
+    _patch_agents(monkeypatch, {"timing": 9})
+
+    assert await idea_repository.try_acquire_scheduler_lock(idea.idea_id, 60) is True
+    result = await snapshot_worker.run_manual_snapshot(idea)
+    assert result is None  # lock already held — skipped, no snapshot written
+
+    history = await log_service.get_snapshot_history(idea.idea_id)
+    assert len(history) == 1  # only the initial snapshot
+
+
+async def test_manual_snapshot_releases_lock_after_completion(mongo_db, monkeypatch):
+    from repositories import idea_repository
+
+    idea = await _seed_idea(mongo_db)
+    _patch_agents(monkeypatch, {"timing": 9})
+
+    await snapshot_worker.run_manual_snapshot(idea)
+    # Lock released — a second run is allowed immediately after.
+    assert await idea_repository.try_acquire_scheduler_lock(idea.idea_id, 60) is True
+
+
+async def test_sweep_due_ideas_only_runs_due_ones(mongo_db, monkeypatch):
+    import datetime as dt
+
+    from core.config import SNAPSHOT_SCHEDULE_INTERVAL_DAYS
+    from repositories import snapshot_repository
+
+    idea = await _seed_idea(mongo_db)
+    _patch_agents(monkeypatch, {"timing": 9})
+
+    # Fresh idea — not due yet.
+    written = await snapshot_worker.sweep_due_ideas()
+    assert written == []
+
+    # Backdate its only snapshot so it's now overdue.
+    latest = await snapshot_repository.get_latest_for_idea(idea.idea_id)
+    coll = snapshot_repository._collection()
+    overdue = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=SNAPSHOT_SCHEDULE_INTERVAL_DAYS + 1)
+    await coll.update_one({"snapshot_id": latest.snapshot_id}, {"$set": {"created_at": overdue}})
+
+    written = await snapshot_worker.sweep_due_ideas()
+    assert len(written) == 1
+    assert written[0].idea_id == idea.idea_id
+    assert written[0].trigger == "scheduled"

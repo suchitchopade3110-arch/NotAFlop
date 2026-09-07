@@ -8,7 +8,7 @@ log; every idea a founder promotes gets its own document and its own
 independent score history, even if the pitch text is byte-identical to
 someone else's.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from pymongo import ASCENDING
 from pymongo.errors import PyMongoError
@@ -118,6 +118,56 @@ def owns(idea: IdeaDocument, session_id: str, account_id: str | None) -> bool:
     if account_id and idea.account_id == account_id:
         return True
     return False
+
+
+async def list_active(limit: int = 500) -> list[IdeaDocument]:
+    """Full scan of active ideas — the scheduler sweep's input set (C1).
+    Not exposed to founders; only services.scheduler calls this."""
+    coll = _collection()
+    if coll is None:
+        return []
+    try:
+        cursor = coll.find({"status": "active"}).limit(limit)
+        raw_docs = await cursor.to_list(length=limit)
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
+        return []
+    return [_load(raw) for raw in raw_docs]
+
+
+async def try_acquire_scheduler_lock(idea_id: str, ttl_seconds: int) -> bool:
+    """Atomic conditional update: succeeds only if no lock is held, or
+    the held lock has expired (a crashed run doesn't wedge the idea
+    forever). C1's idempotency guard — a scheduler tick, a manual
+    force-re-run, and an overlapping sweep can never run a re-score for
+    the same idea concurrently."""
+    coll = _collection()
+    if coll is None:
+        return False
+    now = datetime.now(timezone.utc)
+    until = now + timedelta(seconds=ttl_seconds)
+    try:
+        result = await coll.update_one(
+            {
+                "idea_id": idea_id,
+                "$or": [{"scheduler_lock_until": None}, {"scheduler_lock_until": {"$lt": now}}],
+            },
+            {"$set": {"scheduler_lock_until": until}},
+        )
+        return result.modified_count > 0
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
+        return False
+
+
+async def release_scheduler_lock(idea_id: str) -> None:
+    coll = _collection()
+    if coll is None:
+        return
+    try:
+        await coll.update_one({"idea_id": idea_id}, {"$set": {"scheduler_lock_until": None}})
+    except PyMongoError as exc:
+        mongo.mark_unavailable(exc)
 
 
 async def set_current_snapshot(idea_id: str, snapshot_id: str) -> bool:

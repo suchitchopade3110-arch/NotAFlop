@@ -165,6 +165,10 @@ class IdeaDocument(BaseModel):
     # everything past promotion reads from, never this report again.
     source_report_id: str | None = None
     milestones: list[MilestoneRecord] = Field(default_factory=list)
+    # C1 idempotency: a short-TTL lock so a scheduler tick and a manual
+    # force-re-run (or two overlapping sweeps) can't both run a re-score
+    # for the same idea at once. None/expired = free to acquire.
+    scheduler_lock_until: datetime | None = None
 
 
 class SnapshotDocument(BaseModel):

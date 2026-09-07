@@ -117,6 +117,45 @@ async def test_delete_idea(mongo_db):
     assert await repo.delete_idea(doc.idea_id) is False
 
 
+async def test_list_active_excludes_non_active(mongo_db):
+    active = _make_idea(idea_id="idea_0000000005", share_token="tokE")
+    await repo.create_idea(active)
+    archived = _make_idea(idea_id="idea_0000000006", share_token="tokF")
+    await repo.create_idea(archived)
+
+    coll = repo._collection()
+    await coll.update_one({"idea_id": "idea_0000000006"}, {"$set": {"status": "archived"}})
+
+    listed = await repo.list_active()
+    assert {i.idea_id for i in listed} == {"idea_0000000005"}
+
+
+async def test_scheduler_lock_acquire_and_release(mongo_db):
+    doc = _make_idea()
+    await repo.create_idea(doc)
+
+    assert await repo.try_acquire_scheduler_lock(doc.idea_id, ttl_seconds=60) is True
+    # Already locked — a second acquire fails.
+    assert await repo.try_acquire_scheduler_lock(doc.idea_id, ttl_seconds=60) is False
+
+    await repo.release_scheduler_lock(doc.idea_id)
+    assert await repo.try_acquire_scheduler_lock(doc.idea_id, ttl_seconds=60) is True
+
+
+async def test_scheduler_lock_self_heals_after_ttl(mongo_db):
+    import datetime as dt
+
+    doc = _make_idea()
+    await repo.create_idea(doc)
+    await repo.try_acquire_scheduler_lock(doc.idea_id, ttl_seconds=60)
+
+    coll = repo._collection()
+    expired = dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=1)
+    await coll.update_one({"idea_id": doc.idea_id}, {"$set": {"scheduler_lock_until": expired}})
+
+    assert await repo.try_acquire_scheduler_lock(doc.idea_id, ttl_seconds=60) is True
+
+
 async def test_operations_noop_when_mongo_unavailable(mongo_unavailable):
     doc = _make_idea()
     assert await repo.create_idea(doc) is False
@@ -126,3 +165,6 @@ async def test_operations_noop_when_mongo_unavailable(mongo_unavailable):
     assert await repo.set_current_snapshot(doc.idea_id, "snap_1") is False
     assert await repo.delete_idea(doc.idea_id) is False
     assert await repo.transfer_to_account("sess1", "acct_1") == 0
+    assert await repo.list_active() == []
+    assert await repo.try_acquire_scheduler_lock(doc.idea_id, 60) is False
+    await repo.release_scheduler_lock(doc.idea_id)  # must not raise
