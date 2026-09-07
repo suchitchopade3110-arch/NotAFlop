@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Hero } from "@/components/landing/hero";
 import { Mechanism } from "@/components/landing/mechanism";
@@ -12,9 +13,14 @@ import { VerdictPresentation } from "@/components/verdict/verdict-presentation";
 import { ClaimPrompt } from "@/components/claim/claim-prompt";
 import { ErrorState } from "@/components/ui/error-state";
 import { useValidationFlow } from "@/lib/hooks/use-validation-flow";
+import { track } from "@/lib/analytics/events";
 
 export function HomeFlow() {
   const flow = useValidationFlow();
+
+  useEffect(() => {
+    track.landingViewed();
+  }, []);
 
   if (flow.stage === "idle" || flow.stage === "filtering") {
     return (

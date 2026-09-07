@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchShareCard } from "@/lib/api/server";
 import { ShareCard } from "@/components/share/share-card";
+import { ShareViewTracker } from "@/components/share/share-view-tracker";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -45,6 +46,7 @@ export default async function SharePage({ params }: PageProps) {
 
   return (
     <main id="main-content">
+      <ShareViewTracker verdict={card.verdict} />
       <ShareCard card={card} />
     </main>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useAsync } from "@/lib/hooks/use-async";
 import { listIdeas } from "@/lib/api/routes";
@@ -9,9 +10,19 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/utils/error-message";
+import { track } from "@/lib/analytics/events";
 
 export function LogList() {
   const { data: ideas, loading, error, refetch } = useAsync(() => listIdeas(), []);
+
+  useEffect(() => {
+    // D1: "returned" is the funnel step that separates this product
+    // from a one-shot report — fired once the log actually has
+    // something in it, not on every empty-log visit.
+    if (ideas && ideas.length > 0) {
+      track.returned({ owned_idea_count: ideas.length });
+    }
+  }, [ideas]);
 
   if (loading) {
     return (

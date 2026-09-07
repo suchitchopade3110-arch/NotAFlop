@@ -15,17 +15,22 @@
      gold-deep       #8A6C2E   accent pressed, gradient bottom stop
 
    Ink (text) is a warm off-white family, never pure #fff/#000 — reads
-   softer against the obsidian base and keeps contrast intentional:
-     ink        #F3F1EA   primary text
-     ink-muted  #A9A6A0   secondary text / labels
-     ink-faint  #6E6C66   tertiary / disabled / metadata
+   softer against the obsidian base and keeps contrast intentional.
+   Every text/background pairing below is checked against WCAG AA
+   (4.5:1 normal text) on BOTH obsidian and charcoal, not assumed —
+   ink-faint and nogo were both adjusted from an earlier pass that
+   measured under 4.5:1:
+     ink        #F3F1EA   primary text        — 17.5:1 on obsidian
+     ink-muted  #A9A6A0   secondary text       — 8.2:1 on obsidian
+     ink-faint  #8F8D85   tertiary / metadata  — 6.0:1 on obsidian, 5.5:1 on charcoal
 
    Verdict semantics are a SEPARATE family from the gold accent on purpose
    — a Go/Pivot/No-Go treatment must never be mistaken for brand chrome:
-     go     #3FAE72   jade green
-     pivot  #E08A3C   amber-orange
-     nogo   #C9524A   garnet (deliberately not alarm-red — rejection is a
-                       task to work through, not an error state)
+     go     #3FAE72   jade green    — 6.5:1 on charcoal
+     pivot  #E08A3C   amber-orange  — 6.8:1 on charcoal
+     nogo   #D95950   garnet (deliberately not alarm-red — rejection is a
+                       task to work through, not an error state) — 4.8:1
+                       on charcoal, 5.2:1 on obsidian
 
    Type scale (explicit weight + tracking per step, defined as classes
    below rather than bare utilities so every headline in the app pulls
@@ -78,14 +83,14 @@
 
   --color-ink: #f3f1ea;
   --color-ink-muted: #a9a6a0;
-  --color-ink-faint: #6e6c66;
+  --color-ink-faint: #8f8d85;
 
   --color-go: #3fae72;
   --color-go-wash: #3fae721f;
   --color-pivot: #e08a3c;
   --color-pivot-wash: #e08a3c1f;
-  --color-nogo: #c9524a;
-  --color-nogo-wash: #c9524a1f;
+  --color-nogo: #d95950;
+  --color-nogo-wash: #d959501f;
 
   --font-display: var(--font-space-grotesk), "Segoe UI", sans-serif;
   --font-sans: var(--font-inter), "Segoe UI", sans-serif;

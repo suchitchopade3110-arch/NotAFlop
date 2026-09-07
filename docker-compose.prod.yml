@@ -1,0 +1,89 @@
+# D4/D5: full-stack production compose — backend, frontend, Mongo, Redis.
+# Env vars are documented in .env.example (backend) and
+# frontend/.env.example; both are read from a top-level .env file here
+# (docker compose auto-loads .env next to this file).
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: notaflop-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: notaflop-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notaflop-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: ${MONGODB_DB:-notaflop}
+      REDIS_URL: redis://redis:6379
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      # Comma-separated allowed browser origins — see core/cors.py.
+      # Required (non-empty) whenever ENVIRONMENT != development.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
+      SNAPSHOT_SCHEDULER_ENABLED: ${SNAPSHOT_SCHEDULER_ENABLED:-true}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST}
+        NEXT_PUBLIC_COMING_SOON: ${NEXT_PUBLIC_COMING_SOON:-false}
+    container_name: notaflop-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  mongo_data:
+  redis_data:
