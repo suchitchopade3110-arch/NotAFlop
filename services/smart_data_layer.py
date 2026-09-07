@@ -2,10 +2,16 @@
 Smart Data Layer
 Runs all 5 data sources in parallel.
 Each source is individually cached in Redis with 24hr TTL.
+
+B2: every source's raw output is normalized into the shared SignalResult
+envelope (services.data_sources.result) before it leaves this module —
+the adapters themselves are untouched, this is the wrapping layer the
+Phase 1 B2 task describes.
 """
 import asyncio
 from services import cache
 from services.data_sources import google_trends, reddit, hacker_news, product_hunt, wellfound
+from services.data_sources.result import normalize_source_result
 
 
 async def _fetch_with_cache(source_name: str, fetcher, keyword: str) -> dict:
@@ -24,7 +30,9 @@ async def _fetch_with_cache(source_name: str, fetcher, keyword: str) -> dict:
 async def gather_signals(keyword: str) -> dict:
     """
     Fire all 5 sources in parallel.
-    Returns a unified signals dict ready for the orchestrator.
+    Returns a unified signals dict ready for the orchestrator — each
+    source normalized to the shared SignalResult shape (status, payload,
+    fetched_at, reason).
     """
     results = await asyncio.gather(
         _fetch_with_cache("google_trends", google_trends.fetch, keyword),
@@ -39,9 +47,6 @@ async def gather_signals(keyword: str) -> dict:
     sources = ["google_trends", "reddit", "hacker_news", "product_hunt", "wellfound"]
 
     for name, result in zip(sources, results):
-        if isinstance(result, Exception):
-            signals[name] = {"source": name, "status": "unavailable", "reason": f"live fetch failed: {result}"}
-        else:
-            signals[name] = result
+        signals[name] = normalize_source_result(name, result).model_dump(mode="json")
 
     return {"keyword": keyword, "signals": signals}
