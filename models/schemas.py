@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from core.validation import TranscriptValidationError, validate_transcript
 from models.documents import AgentResultRecord, VerifierOutput
 
 
@@ -15,6 +16,16 @@ class TranscribeResponse(BaseModel):
 # ── Filter ────────────────────────────────────────────────────
 class FilterRequest(BaseModel):
     transcript: str
+
+    @field_validator("transcript")
+    @classmethod
+    def _validate_transcript(cls, value: str) -> str:
+        # C5: shared across every transcript entry path — see
+        # core/validation.py's module docstring.
+        try:
+            return validate_transcript(value)
+        except TranscriptValidationError as exc:
+            raise ValueError(exc.detail) from exc
 
 
 class AgentResult(BaseModel):

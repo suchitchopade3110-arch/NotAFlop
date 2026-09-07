@@ -51,5 +51,10 @@ GROQ_PRICE_PER_MILLION_TOKENS: dict[str, dict[str, float]] = {
 GROQ_DEFAULT_PROMPT_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_PROMPT_PRICE_PER_M", "0.59"))
 GROQ_DEFAULT_COMPLETION_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_COMPLETION_PRICE_PER_M", "0.79"))
 
+# Input validation (C5). Applies uniformly to every transcript entry path
+# — typed text, audio (post-Whisper), and any future video-transcript
+# path — via core.validation.validate_transcript().
+TRANSCRIPT_MAX_LENGTH: int = int(os.getenv("TRANSCRIPT_MAX_LENGTH", "5000"))
+
 # Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
 # it versions, instead of here — stamped on every report at write time.
