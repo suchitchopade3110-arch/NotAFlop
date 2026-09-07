@@ -64,6 +64,11 @@ class ReportDocument(BaseModel):
     # disclosure layer — never feeds back into scoring.
     conflicts: list[dict] = Field(default_factory=list)
 
+    # C3: aggregate Groq cost across every agent call for this report (see
+    # services/cost_tracking.py). Approximate/observability, not billing-
+    # grade — never fed back into scoring.
+    report_cost_usd: float = 0.0
+
     agent_results: dict[str, AgentResultRecord] = Field(default_factory=dict)
     verifier: VerifierOutput | None = None
 

@@ -27,6 +27,7 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, stop_after_d
 
 from core.config import GROQ_API_KEY, WHISPER_MODEL
 from core.logging import get_logger
+from services import cost_tracking
 
 logger = get_logger("notaflop.groq_client")
 
@@ -127,4 +128,20 @@ async def chat(
         if res.status_code >= 400:
             logger.error("groq_error", agent=agent_name, status=res.status_code, body=res.text)
         res.raise_for_status()
-        return res.json()["choices"][0]["message"]["content"].strip()
+        body = res.json()
+
+        # C3: token/cost logging — every call, tagged with agent_name (and
+        # request_id/session_id via the bound contextvars already merged
+        # into every structlog call, see core/logging.py).
+        usage = body.get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        cost_usd = cost_tracking.record_call(agent_name, model, prompt_tokens, completion_tokens)
+        logger.info(
+            "groq_call_cost",
+            agent=agent_name, model=model,
+            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+            cost_usd=cost_usd, status="ok",
+        )
+
+        return body["choices"][0]["message"]["content"].strip()

@@ -34,5 +34,22 @@ VERIFIER_PENALTY_ENABLED: bool = os.getenv("VERIFIER_PENALTY_ENABLED", "false").
 # open with no credential to check against.
 ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
 
+# Cost estimation (C3) — approximate USD-per-million-token prices, for
+# per-call/per-report cost *observability*, not billing-grade figures.
+# Override via env if Groq's published pricing changes; unlisted models
+# fall back to the GROQ_DEFAULT_* pair below.
+GROQ_PRICE_PER_MILLION_TOKENS: dict[str, dict[str, float]] = {
+    "llama-3.3-70b-versatile": {
+        "prompt": float(os.getenv("GROQ_PRICE_LLAMA_70B_PROMPT", "0.59")),
+        "completion": float(os.getenv("GROQ_PRICE_LLAMA_70B_COMPLETION", "0.79")),
+    },
+    "llama-3.1-8b-instant": {
+        "prompt": float(os.getenv("GROQ_PRICE_LLAMA_8B_PROMPT", "0.05")),
+        "completion": float(os.getenv("GROQ_PRICE_LLAMA_8B_COMPLETION", "0.08")),
+    },
+}
+GROQ_DEFAULT_PROMPT_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_PROMPT_PRICE_PER_M", "0.59"))
+GROQ_DEFAULT_COMPLETION_PRICE_PER_M: float = float(os.getenv("GROQ_DEFAULT_COMPLETION_PRICE_PER_M", "0.79"))
+
 # Scoring: WEIGHTS_VERSION now lives in services/gate.py, next to the WEIGHTS
 # it versions, instead of here — stamped on every report at write time.

@@ -197,24 +197,33 @@ async def patch_verifier(
     verifier: VerifierOutput,
     adjusted_score: int,
     verdict_would_flip: bool,
+    *,
+    additional_cost_usd: float = 0.0,
 ) -> bool:
     """Fire-and-forget patch applied once the Verifier lands after the
-    report has already streamed and been persisted (shadow mode)."""
+    report has already streamed and been persisted (shadow mode).
+
+    additional_cost_usd (C3): shadow mode runs the Verifier's Groq call in
+    a task spawned AFTER the report's initial report_cost_usd was already
+    read and persisted (see orchestrator.graph._spawn_verifier_shadow), so
+    that initial total doesn't include it — $inc adds it on here rather
+    than $set overwriting whatever the field already held."""
     coll = _collection()
     if coll is None:
         return False
 
+    update: dict = {
+        "$set": {
+            "verifier": verifier.model_dump(),
+            "adjusted_score": adjusted_score,
+            "verdict_would_flip": verdict_would_flip,
+        }
+    }
+    if additional_cost_usd:
+        update["$inc"] = {"report_cost_usd": additional_cost_usd}
+
     try:
-        result = await coll.update_one(
-            {"public_id": public_id},
-            {
-                "$set": {
-                    "verifier": verifier.model_dump(),
-                    "adjusted_score": adjusted_score,
-                    "verdict_would_flip": verdict_would_flip,
-                }
-            },
-        )
+        result = await coll.update_one({"public_id": public_id}, update)
         return result.modified_count > 0
     except PyMongoError as exc:
         mongo.mark_unavailable(exc)
