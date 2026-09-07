@@ -23,9 +23,26 @@ export interface TranscribeResponse {
 }
 
 // ── Smart data layer (Phase 2 backend / signals) ─────────────────────
-// Shape is intentionally loose (dict on the backend) — the UI reads only
-// the keys it needs and treats everything else as opaque.
-export type SignalsPayload = Record<string, unknown>;
+export type SignalStatus = "ok" | "empty" | "unavailable" | "rate_limited" | "error";
+
+export interface SignalResult {
+  source: string;
+  status: SignalStatus;
+  payload: Record<string, unknown> | null;
+  fetched_at: string;
+  reason: string | null;
+}
+
+/** Flat {source_name: SignalResult} map — this is the shape
+ * AnalyzeRequest.signals expects, i.e. GatherSignalsResponse.signals,
+ * NOT the wrapper object itself. See lib/utils/keyword.ts's doc comment
+ * for why the frontend derives its own keyword to seed this call. */
+export type SignalsPayload = Record<string, SignalResult>;
+
+export interface GatherSignalsResponse {
+  keyword: string;
+  signals: SignalsPayload;
+}
 
 // ── Streaming analyze (Phase 3) ───────────────────────────────────────
 export interface AgentOutput {
@@ -263,6 +280,20 @@ export interface PlanResponse {
   team: TeamRole[];
   revenue_model_options: string[];
   solo_founder_note: string | null;
+}
+
+// ── Gate (Phase 4) ─────────────────────────────────────────────────────
+export interface RiskItem {
+  agent: string;
+  score: number;
+  feedback: string;
+}
+
+export interface GateResponse {
+  score: number;
+  verdict: string;
+  top_risks: RiskItem[];
+  gate_reason: string;
 }
 
 // ── Generic API error shape ────────────────────────────────────────────

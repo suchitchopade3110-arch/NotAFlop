@@ -1,10 +1,13 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  AgentOutput,
   ClaimResponse,
   CriterionResponse,
   EvidenceResponse,
   EvidenceType,
   FilterResponse,
+  GateResponse,
+  GatherSignalsResponse,
   IdeaDetailResponse,
   IdeaSummary,
   MeResponse,
@@ -14,7 +17,6 @@ import type {
   ReportSummary,
   SessionResponse,
   ShareCardResponse,
-  SignalsPayload,
   SnapshotSummary,
   TimelineEntry,
   TranscribeResponse,
@@ -38,7 +40,7 @@ export const runFilter = (transcript: string) =>
 
 // ── Phase 2 — Smart data layer ─────────────────────────────────────
 export const gatherSignals = (keyword: string) =>
-  apiFetch<SignalsPayload>("/api/phase2/validate", { method: "POST", body: { keyword } });
+  apiFetch<GatherSignalsResponse>("/api/phase2/validate", { method: "POST", body: { keyword } });
 
 // Streaming analyze lives in lib/api/stream.ts (needs raw body access).
 
@@ -47,6 +49,12 @@ export const getReport = (publicId: string) => apiFetch<ReportResponse>(`/api/re
 
 export const listSessionReports = (sessionId: string) =>
   apiFetch<ReportSummary[]>(`/api/sessions/${sessionId}/reports`);
+
+// ── Phase 4 — Gate (re-derives gate_reason/top_risks from the same
+// agent results the stream already delivered — no rescoring happens,
+// this is a read-only enrichment call) ──────────────────────────────
+export const computeGate = (results: Record<string, AgentOutput>) =>
+  apiFetch<GateResponse>("/api/phase4/gate", { method: "POST", body: { results } });
 
 // ── Phase 5 — Plan ──────────────────────────────────────────────────
 export const generatePlan = (reportId: string) =>
